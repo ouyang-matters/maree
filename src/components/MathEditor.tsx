@@ -131,6 +131,13 @@ const formattingKeymap = keymap.of([
   { key: "Mod-Shift-e", run: (v) => wrap(v, "\\begin{align*}\n", "\n\\end{align*}") },
 ]);
 
+/**
+ * Browsers (WebView2 in particular) sometimes put U+00A0 into contenteditable text when a
+ * space is typed at the end of a line. The editor's DOM is left alone (rewriting it fights
+ * the browser), but every value leaving the editor uses ordinary spaces.
+ */
+const plainSpaces = (v: string) => (v.includes("\u00a0") ? v.replace(/\u00a0/g, " ") : v);
+
 const editorTheme = EditorView.theme({
   "&": { height: "100%", backgroundColor: "transparent", color: "var(--text)", fontSize: "var(--editor-font-size)" },
   ".cm-scroller": { fontFamily: "var(--font-mono)", lineHeight: "1.65", overflow: "auto" },
@@ -225,7 +232,7 @@ export function MathEditor({
       EditorView.contentAttributes.of({ spellcheck: spellcheck ? "true" : "false", "aria-label": label ?? "LaTeX source" }),
       EditorView.updateListener.of((u) => {
         if (u.docChanged) {
-          const v = u.state.doc.toString();
+          const v = plainSpaces(u.state.doc.toString());
           onChangeRef.current(v);
           if (previewTimer.current) clearTimeout(previewTimer.current);
           previewTimer.current = setTimeout(() => setPreview(v), 110);
@@ -264,7 +271,7 @@ export function MathEditor({
   // External changes (e.g. restoring an attempt) replace the document.
   useEffect(() => {
     const view = viewRef.current;
-    if (view && view.state.doc.toString() !== value && !view.hasFocus) {
+    if (view && plainSpaces(view.state.doc.toString()) !== value && !view.hasFocus) {
       view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: value } });
     }
     if (!view || !view.hasFocus) setPreview(value);

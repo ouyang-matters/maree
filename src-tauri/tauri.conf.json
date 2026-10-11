@@ -37,12 +37,18 @@
         "font-src": "'self' data:",
         "worker-src": "'self' blob:",
         "connect-src": "'self' ipc: http://ipc.localhost blob: data:"
-      }
+      },
+      "dangerousDisableAssetCspModification": [
+        "style-src"
+      ]
     }
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "msi"],
+    "targets": [
+      "nsis",
+      "msi"
+    ],
     "publisher": "Marée",
     "copyright": "© 2026 Marée contributors",
     "category": "Education",
@@ -55,7 +61,9 @@
       "icons/icon.ico"
     ],
     "windows": {
-      "webviewInstallMode": { "type": "downloadBootstrapper" },
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
       "nsis": {
         "installMode": "currentUser",
         "displayLanguageSelector": false,

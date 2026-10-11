@@ -72,6 +72,23 @@ if (scenario === "tour") {
   await shot("10-help");
 }
 
+if (scenario === "docs") {
+  await page.getByRole("button", { name: "Load a small sample library" }).click();
+  await page.waitForTimeout(800);
+  await page.locator(".tab", { hasText: "Welcome" }).locator(".tab-close").click();
+  await page.locator(".lp-row", { hasText: "Newton" }).first().dblclick();
+  await page.waitForTimeout(5600);
+  await shot("problem");
+  await page.locator(".lp-row", { hasText: "A limit from the definition" }).first().dblclick();
+  await page.waitForTimeout(800);
+  await page.locator(".pv").evaluate((el) => (el.scrollTop = 420));
+  await shot("editor");
+  await page.locator(".sb-item", { hasText: "Review Queue" }).click();
+  await page.keyboard.press("Control+Shift+G");
+  await page.waitForTimeout(600);
+  await shot("progress");
+}
+
 if (scenario === "acceptance") {
   const fixture = new URL("../tests/fixtures/MATH147_Proof_Practice_Lectures_7-12.pdf", import.meta.url);
   const pdfPath = decodeURIComponent(fixture.pathname.replace(/^\/([A-Za-z]:)/, "$1"));

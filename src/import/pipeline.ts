@@ -64,7 +64,7 @@ export async function sha256Hex(bytes: Uint8Array): Promise<string> {
 }
 
 function decodeText(bytes: Uint8Array): string {
-  return new TextDecoder("utf-8").decode(bytes).replace(/^﻿/, "");
+  return new TextDecoder("utf-8").decode(bytes).replace(/^\ufeff/, "");
 }
 
 export interface ExtractDeps {

@@ -673,6 +673,11 @@
   max-height: 70vh;
 }
 
+.mx-editor .cm-editor,
+.mx-editor .cm-content {
+  user-select: text;
+  -webkit-user-select: text;
+}
 .cm-editor .cm-math {
   color: color-mix(in srgb, var(--accent) 72%, var(--text));
 }

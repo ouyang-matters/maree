@@ -66,8 +66,8 @@ export function normalizeExtracted(s: string): string {
     const alnum = mathAlnumToAscii(cp);
     if (alnum !== null) out += alnum;
     else if (LIGATURES[ch]) out += LIGATURES[ch];
-    else if (ch === " " || ch === " " || ch === " " || ch === " " || ch === " ") out += " ";
-    else if (ch === "­" || ch === "​" || ch === "﻿") continue;
+    else if (ch === "\u00a0" || ch === "\u2009" || ch === "\u202f" || ch === "\u2002" || ch === "\u2003") out += " ";
+    else if (ch === "\u00ad" || ch === "\u200b" || ch === "\ufeff") continue;
     else if (cp === 0x210e) out += "h"; // planck constant used as italic h
     else out += ch;
   }

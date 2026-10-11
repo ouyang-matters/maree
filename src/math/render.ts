@@ -310,8 +310,8 @@ const SIMPLE_REPLACEMENTS: Record<string, string> = {
   textemdash: "—",
   LaTeX: "LaTeX",
   TeX: "TeX",
-  qquad: "  ",
-  quad: " ",
+  qquad: "\u2003\u2003",
+  quad: "\u2003",
 };
 
 const DROPPED_COMMANDS = /^\\(noindent|medskip|smallskip|bigskip|par|newpage|clearpage|centering|indent|hfill|vfill|maketitle)\b\s*/;
