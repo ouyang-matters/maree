@@ -48,10 +48,13 @@ its provenance, and your proofs, attempts and notes stay on your own computer.
 
 ## Install (Windows 10/11)
 
-Download one of the installers built in `src-tauri/target/release/bundle/`:
+The installers are in the `release/` folder (a fresh build writes them to
+`src-tauri/target/release/bundle/`):
 
-* `nsis/Marée_1.0.0_x64-setup.exe` — per-user installer (no administrator rights needed)
-* `msi/Marée_1.0.0_x64_en-US.msi` — MSI package for managed installs
+* `Marée_1.0.0_x64-setup.exe` — per-user installer, no administrator rights needed
+  (recommended; tested: install, full acceptance run, clean uninstall)
+* `Marée_1.0.0_x64_en-US.msi` — MSI package for managed, per-machine installs (built, not install-tested)
+* `maree-portable.exe` — the bare executable, for portable use (see below)
 
 Marée uses Microsoft Edge WebView2, which is part of Windows 11 and current Windows 10;
 the installer downloads it if missing. The installers are not code-signed, so Windows
@@ -94,7 +97,13 @@ Press `F1` inside the app for all keyboard shortcuts and a LaTeX syntax referenc
 Requirements: Node.js ≥ 22, Rust (stable, MSVC toolchain), Visual Studio Build Tools
 with the C++ workload, WebView2 runtime.
 
+Build on a local NTFS disk. A Google Drive / OneDrive virtual drive is a poor place for
+`node_modules` and Rust build output (tens of thousands of files, no junctions). The full
+history is included as `maree-git-history.bundle`:
+
 ```bash
+git clone maree-git-history.bundle C:\dev\maree
+cd C:\dev\maree
 npm install
 npm run tauri:dev      # run the desktop app with hot reload
 npm run tauri:build    # release build + NSIS and MSI installers
