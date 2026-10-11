@@ -288,6 +288,19 @@ export function showTopic(id: string): void {
   resetList({ listMode: "filter", filter: { topicIds: [id], includeSubtopics: true }, origin: { kind: "topic", id, label: tp.name } });
 }
 
+/** A topic within one course: "MATH 147 · Cauchy Sequences". */
+export function showCourseTopic(courseId: string, topicId: string): void {
+  const c = get().index.courses.get(courseId);
+  const tp = get().index.topics.get(topicId);
+  if (!c || !tp) return;
+  resetList({
+    listMode: "filter",
+    filter: { courseIds: [courseId], topicIds: [topicId], includeSubtopics: true },
+    origin: { kind: "topic", id: topicId, courseId, label: `${c.code || c.title} · ${tp.name}` },
+    activeCourseId: courseId,
+  });
+}
+
 export function showSource(id: string): void {
   const src = get().index.sources.get(id);
   if (!src) return;
@@ -664,6 +677,7 @@ export async function createProblem(init: Partial<NewProblem> = {}): Promise<str
     ctx.courseId = s.index.lectures.get(o.id)?.courseId ?? null;
   }
   if (o.kind === "topic" && o.id) ctx.topicIds = [o.id];
+  if (o.courseId) ctx.courseId = o.courseId;
   if (o.kind === "source" && o.id) ctx.sourceId = o.id;
   const id = await repo.createProblem({ ...ctx, ...init });
   await refreshProblems([id]);

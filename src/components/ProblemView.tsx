@@ -603,13 +603,15 @@ function Attachments({ p }: { p: Problem }) {
       <div className="pv-section-head">
         <Paperclip size={13} /> {t("Attachments")}
         <span className="grow" />
-        <button className="btn btn-ghost btn-sm" onClick={() => A.addAttachments(p.id)}>
+        <button
+          className="btn btn-ghost btn-sm"
+          title={t("Drop images or PDFs here. Reference an image in any text as ![caption](attachment:file-name.png).")}
+          onClick={() => A.addAttachments(p.id)}
+        >
           <ImagePlus size={13} /> {t("Add file")}
         </button>
       </div>
-      {p.attachments.length === 0 ? (
-        <div className="work-empty">{t("Drop images or PDFs here. Reference an image in any text as ![caption](attachment:file-name.png).")}</div>
-      ) : (
+      {p.attachments.length === 0 ? null : (
         <div className="att-grid">
           {p.attachments.map((a) => (
             <figure
@@ -708,7 +710,7 @@ function Provenance({ p }: { p: Problem }) {
           )}
         </dl>
       )}
-      {src && (
+      {open && src && (
         <div className="row" style={{ marginTop: 6 }}>
           {src.storedPath && src.format === "pdf" && (
             <button className="btn btn-sm" onClick={() => A.openSource(src.id, p.sourcePage ?? undefined, true)}>
@@ -736,6 +738,8 @@ export function ProblemView({ problemId }: { problemId: string }) {
   const topics = useStore((s) => s.topics);
   const index = useStore((s) => s.index);
   const [editStatement, setEditStatement] = useState<boolean | null>(null);
+  // Course, lectures, topics, difficulty… stay folded into one summary line until asked for.
+  const detailsHidden = useStore((s) => s.layout.collapsed["problem-details"] ?? true);
   const [vs, setVs] = useState(() => viewState.get(problemId) ?? { work: "solution" as WorkTab, revealed: false });
   const titleRef = useRef<HTMLInputElement>(null);
 
@@ -792,6 +796,13 @@ export function ProblemView({ problemId }: { problemId: string }) {
   const course = p.courseId ? index.courses.get(p.courseId) : null;
   const src = p.sourceId ? index.sources.get(p.sourceId) : null;
   const today = todayLocal();
+  const summaryParts = [
+    ...p.topicIds.map((id) => index.topics.get(id)?.name).filter((x): x is string => !!x),
+    p.difficulty ? t(DIFFICULTY_LABEL[p.difficulty]) : null,
+    p.category ? t(CATEGORY_LABEL[p.category]) : null,
+    p.priority > 0 ? t(PRIORITY_LABEL[p.priority]) : null,
+    p.reviewDue ? t("Review {date}", { date: A.formatDate(p.reviewDue) }) : null,
+  ].filter((x): x is string => !!x);
 
   const setStatus = (s: Status) => void A.patchProblem(p.id, { status: s });
 
@@ -839,34 +850,20 @@ export function ProblemView({ problemId }: { problemId: string }) {
         </div>
 
         <div className="pv-meta">
-          <StatusControl value={p.status} onChange={setStatus} />
-          <DifficultyPicker value={p.difficulty} onChange={(d) => A.patchProblem(p.id, { difficulty: d })} />
+          <StatusControl value={p.status} onChange={setStatus} compact={detailsHidden} />
           <button
-            className="meta-btn"
-            onClick={(e) =>
-              openMenuBelow(e.currentTarget, [
-                ...(["proof", "calculation", "conceptual", "application"] as Category[]).map((c) => ({
-                  label: t(CATEGORY_LABEL[c]),
-                  checked: p.category === c ? true : undefined,
-                  onSelect: () => A.patchProblem(p.id, { category: c }),
-                })),
-                { separator: true },
-                { label: t("None"), onSelect: () => A.patchProblem(p.id, { category: null }) },
-              ])
-            }
+            className="pv-details-toggle"
+            aria-expanded={!detailsHidden}
+            title={detailsHidden ? t("Show details") : t("Hide details")}
+            onClick={() => A.updateLayout({ collapsed: { ...get().layout.collapsed, "problem-details": !detailsHidden } })}
           >
-            <PencilLine size={13} />
-            <span className="meta-label">{p.category ? t(CATEGORY_LABEL[p.category]) : t("Type")}</span>
+            {detailsHidden ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+            {detailsHidden ? (
+              <span className="pv-summary ellipsis">{summaryParts.join(" · ") || t("Details")}</span>
+            ) : (
+              <span>{t("Hide details")}</span>
+            )}
           </button>
-          <button className={`meta-btn${p.reviewDue && p.reviewDue <= today ? " due" : ""}`} onClick={(e) => openMenuBelow(e.currentTarget, reviewDateItems([p.id]))}>
-            <CalendarClock size={13} />
-            <span className="meta-label">{p.reviewDue ? t("Review {date}", { date: A.formatDate(p.reviewDue) }) : t("Schedule review")}</span>
-          </button>
-          {p.priority > 0 && (
-            <span className="meta-btn static" title={t("Priority")}>
-              <Flag size={13} color="var(--accent)" /> <span className="meta-label">{t(PRIORITY_LABEL[p.priority])}</span>
-            </span>
-          )}
         </div>
         {p.status === "needs_review" && !p.reviewDue && (
           <div className="inline-suggest">
@@ -883,77 +880,111 @@ export function ProblemView({ problemId }: { problemId: string }) {
           </div>
         )}
 
-        <div className="pv-taxonomy">
-          <ChipPicker
-            icon={<GraduationCap size={13} />}
-            label={t("Course")}
-            emptyLabel={t("Set course")}
-            single
-            chips={course ? [{ id: course.id, label: course.code || course.title, onClick: () => A.showCourse(course.id) }] : []}
-            options={courses.map((c) => ({ id: c.id, label: courseLabel(c) }))}
-            selected={p.courseId ? [p.courseId] : []}
-            onToggle={(id, on) => A.patchProblem(p.id, { courseId: on ? id : null })}
-            onCreate={async (name) => {
-              const id = await A.createCourse({ code: name });
-              await A.patchProblem(p.id, { courseId: id });
-            }}
-          />
-          <ChipPicker
-            icon={<Hash size={13} />}
-            label={t("Lectures")}
-            emptyLabel={t("Add lecture")}
-            chips={p.lectureIds
-              .map((id) => index.lectures.get(id))
-              .filter(Boolean)
-              .map((l) => ({ id: l!.id, label: lectureLabel(l!), onClick: () => A.showLecture(l!.id) }))}
-            options={p.courseId ? lectureOptions.filter((o) => index.lectures.get(o.id)?.courseId === p.courseId).concat(lectureOptions.filter((o) => index.lectures.get(o.id)?.courseId !== p.courseId)) : lectureOptions}
-            selected={p.lectureIds}
-            onToggle={(id, on) => {
-              const l = index.lectures.get(id);
-              void A.patchProblem(p.id, {
-                lectureIds: on ? [...p.lectureIds, id] : p.lectureIds.filter((x) => x !== id),
-                ...(on && l && !p.courseId ? { courseId: l.courseId } : {}),
-              });
-            }}
-            onCreate={
-              p.courseId
-                ? async (name) => {
-                    const m = /^(?:lecture\s*)?(\d+[a-z]?)\s*[—–:-]?\s*(.*)$/i.exec(name);
-                    const [l] = await A.createLectures([{ courseId: p.courseId!, number: m ? m[1] : "", title: m ? m[2] : name }]);
-                    await A.patchProblem(p.id, { lectureIds: [...p.lectureIds, l.id] });
-                  }
-                : undefined
-            }
-          />
-          <ChipPicker
-            icon={<Hash size={13} />}
-            label={t("Topics")}
-            emptyLabel={t("Add topic")}
-            chips={p.topicIds
-              .map((id) => index.topics.get(id))
-              .filter(Boolean)
-              .map((tp) => ({ id: tp!.id, label: tp!.name, onClick: () => A.showTopic(tp!.id) }))}
-            options={topicOptions}
-            selected={p.topicIds}
-            onToggle={(id, on) => A.patchProblem(p.id, { topicIds: on ? [...p.topicIds, id] : p.topicIds.filter((x) => x !== id) })}
-            onCreate={async (name) => {
-              const tp = await A.createTopic({ name });
-              await A.patchProblem(p.id, { topicIds: [...p.topicIds, tp.id] });
-            }}
-          />
-          {src && (
-            <div className="meta-line">
-              <span className="meta-key">
-                <FileText size={13} />
-                {t("Source")}
-              </span>
-              <button className="chip static chip-link" onClick={() => (src.storedPath && src.format === "pdf" ? A.openSource(src.id, p.sourcePage ?? undefined, true) : A.showSource(src.id))}>
-                {src.title}
-                {p.sourcePage ? ` · p. ${p.sourcePage}` : ""}
+        {!detailsHidden && (
+          <>
+            <div className="pv-meta pv-meta-extra">
+              <DifficultyPicker value={p.difficulty} onChange={(d) => A.patchProblem(p.id, { difficulty: d })} />
+              <button
+                className="meta-btn"
+                onClick={(e) =>
+                  openMenuBelow(e.currentTarget, [
+                    ...(["proof", "calculation", "conceptual", "application"] as Category[]).map((c) => ({
+                      label: t(CATEGORY_LABEL[c]),
+                      checked: p.category === c ? true : undefined,
+                      onSelect: () => A.patchProblem(p.id, { category: c }),
+                    })),
+                    { separator: true },
+                    { label: t("None"), onSelect: () => A.patchProblem(p.id, { category: null }) },
+                  ])
+                }
+              >
+                <PencilLine size={13} />
+                <span className="meta-label">{p.category ? t(CATEGORY_LABEL[p.category]) : t("Type")}</span>
               </button>
+              <button className={`meta-btn${p.reviewDue && p.reviewDue <= today ? " due" : ""}`} onClick={(e) => openMenuBelow(e.currentTarget, reviewDateItems([p.id]))}>
+                <CalendarClock size={13} />
+                <span className="meta-label">{p.reviewDue ? t("Review {date}", { date: A.formatDate(p.reviewDue) }) : t("Schedule review")}</span>
+              </button>
+              {p.priority > 0 && (
+                <span className="meta-btn static" title={t("Priority")}>
+                  <Flag size={13} color="var(--accent)" /> <span className="meta-label">{t(PRIORITY_LABEL[p.priority])}</span>
+                </span>
+              )}
             </div>
-          )}
-        </div>
+            <div className="pv-taxonomy">
+              <ChipPicker
+                icon={<GraduationCap size={13} />}
+                label={t("Course")}
+                emptyLabel={t("Set course")}
+                single
+                chips={course ? [{ id: course.id, label: course.code || course.title, onClick: () => A.showCourse(course.id) }] : []}
+                options={courses.map((c) => ({ id: c.id, label: courseLabel(c) }))}
+                selected={p.courseId ? [p.courseId] : []}
+                onToggle={(id, on) => A.patchProblem(p.id, { courseId: on ? id : null })}
+                onCreate={async (name) => {
+                  const id = await A.createCourse({ code: name });
+                  await A.patchProblem(p.id, { courseId: id });
+                }}
+              />
+              <ChipPicker
+                icon={<Hash size={13} />}
+                label={t("Lectures")}
+                emptyLabel={t("Add lecture")}
+                chips={p.lectureIds
+                  .map((id) => index.lectures.get(id))
+                  .filter(Boolean)
+                  .map((l) => ({ id: l!.id, label: lectureLabel(l!), onClick: () => A.showLecture(l!.id) }))}
+                options={p.courseId ? lectureOptions.filter((o) => index.lectures.get(o.id)?.courseId === p.courseId).concat(lectureOptions.filter((o) => index.lectures.get(o.id)?.courseId !== p.courseId)) : lectureOptions}
+                selected={p.lectureIds}
+                onToggle={(id, on) => {
+                  const l = index.lectures.get(id);
+                  void A.patchProblem(p.id, {
+                    lectureIds: on ? [...p.lectureIds, id] : p.lectureIds.filter((x) => x !== id),
+                    ...(on && l && !p.courseId ? { courseId: l.courseId } : {}),
+                  });
+                }}
+                onCreate={
+                  p.courseId
+                    ? async (name) => {
+                        const m = /^(?:lecture\s*)?(\d+[a-z]?)\s*[—–:-]?\s*(.*)$/i.exec(name);
+                        const [l] = await A.createLectures([{ courseId: p.courseId!, number: m ? m[1] : "", title: m ? m[2] : name }]);
+                        await A.patchProblem(p.id, { lectureIds: [...p.lectureIds, l.id] });
+                      }
+                    : undefined
+                }
+              />
+              <ChipPicker
+                icon={<Hash size={13} />}
+                label={t("Topics")}
+                emptyLabel={t("Add topic")}
+                chips={p.topicIds
+                  .map((id) => index.topics.get(id))
+                  .filter(Boolean)
+                  .map((tp) => ({ id: tp!.id, label: tp!.name, onClick: () => A.showTopic(tp!.id) }))}
+                options={topicOptions}
+                selected={p.topicIds}
+                onToggle={(id, on) => A.patchProblem(p.id, { topicIds: on ? [...p.topicIds, id] : p.topicIds.filter((x) => x !== id) })}
+                onCreate={async (name) => {
+                  const tp = await A.createTopic({ name });
+                  await A.patchProblem(p.id, { topicIds: [...p.topicIds, tp.id] });
+                }}
+              />
+              {src && (
+                <div className="meta-line">
+                  <span className="meta-key">
+                    <FileText size={13} />
+                    {t("Source")}
+                  </span>
+                  <button className="chip static chip-link" onClick={() => (src.storedPath && src.format === "pdf" ? A.openSource(src.id, p.sourcePage ?? undefined, true) : A.showSource(src.id))}>
+                    {src.title}
+                    {p.sourcePage ? ` · p. ${p.sourcePage}` : ""}
+                  </button>
+                </div>
+              )}
+            </div>
+
+          </>
+        )}
 
         {p.importFlags.length > 0 && <ImportBanner p={p} />}
 

@@ -41,6 +41,8 @@ export type ListMode = "filter" | "review" | "recent" | "trash";
 export interface ListOrigin {
   kind: "all" | "course" | "lecture" | "topic" | "source" | "view" | "custom" | "unassigned" | "import-review";
   id?: string;
+  /** Set when the scope is a topic (or source) inside one course. */
+  courseId?: string;
   label: string;
 }
 

@@ -203,6 +203,7 @@ const CompactRow = memo(function CompactRow({
   onContext,
   onDragStart,
   flat,
+  showCourse,
 }: {
   p: ProblemSummary;
   index: LibraryIndex;
@@ -211,6 +212,8 @@ const CompactRow = memo(function CompactRow({
   focused: boolean;
   top: number;
   flat?: boolean;
+  /** Only useful when the library has several courses. */
+  showCourse?: boolean;
   onMouseDown: (e: React.MouseEvent, id: string) => void;
   onDoubleClick: (id: string) => void;
   onContext: (e: React.MouseEvent, id: string) => void;
@@ -242,7 +245,7 @@ const CompactRow = memo(function CompactRow({
           <ProblemTitle p={p} />
         </div>
         <div className="lp-compact-meta">
-          {course && <span>{course.code || course.title}</span>}
+          {showCourse && course && <span>{course.code || course.title}</span>}
           {lec && <span>{lec.number ? `L${lec.number}` : lec.title}</span>}
           {topics.length > 0 && <span className="ellipsis">{topics.join(", ")}</span>}
           {p.reviewDue && <span className={due ? "due-past" : ""}>{t("review {date}", { date: A.formatDate(p.reviewDue) })}</span>}
@@ -350,6 +353,7 @@ function TableView({ list, onOpen }: { list: ProblemSummary[]; onOpen: (id: stri
   const today = todayLocal();
   const ids = useMemo(() => list.map((p) => p.id), [list]);
   const [width, setWidth] = useState(1000);
+  const manyCourses = useStore((s) => s.courses.filter((c) => !c.archived).length > 1);
   const compact = width < 640;
   const rowH = compact ? 50 : 30;
   const virt = useVirtualizer({ count: list.length, getScrollElement: () => scrollRef.current, estimateSize: () => rowH, overscan: 12 });
@@ -427,6 +431,7 @@ function TableView({ list, onOpen }: { list: ProblemSummary[]; onOpen: (id: stri
               return (
                 <CompactRow
                   key={p.id}
+                  showCourse={manyCourses}
                   p={p}
                   index={index}
                   today={today}
@@ -549,6 +554,7 @@ function CardView({ list, onOpen }: { list: ProblemSummary[]; onOpen: (id: strin
   const index = useStore((s) => s.index);
   const selection = useStore((s) => s.selection);
   const [limit, setLimit] = useState(120);
+  const manyCourses = useStore((s) => s.courses.filter((c) => !c.archived).length > 1);
   const ids = useMemo(() => list.map((p) => p.id), [list]);
   return (
     <div className="lp-body" tabIndex={0} onKeyDown={(e) => listKeys(e, ids, onOpen)}>
@@ -579,7 +585,7 @@ function CardView({ list, onOpen }: { list: ProblemSummary[]; onOpen: (id: strin
               </div>
               <div className="card-body prose-mini" dangerouslySetInnerHTML={{ __html: renderMarkdown(safeTruncate(p.preview, 320)) }} />
               <div className="card-foot">
-                {course && (
+                {manyCourses && course && (
                   <span className="row" style={{ gap: 3 }}>
                     <GraduationCap size={12} /> {course.code || course.title}
                   </span>
@@ -615,6 +621,7 @@ function ReviewView({ onOpen }: { onOpen: (id: string, preview: boolean) => void
   const index = useStore((s) => s.index);
   const selection = useStore((s) => s.selection);
   const focusedId = useStore((s) => s.focusedId);
+  const manyCourses = useStore((s) => s.courses.filter((c) => !c.archived).length > 1);
   const today = todayLocal();
   const groups = useMemo(
     () => reviewGroups(applyFilter(problems, filter, { index, searchHits: hits, today }), today),
@@ -643,6 +650,7 @@ function ReviewView({ onOpen }: { onOpen: (id: string, preview: boolean) => void
             <CompactRow
               key={p.id}
               flat
+              showCourse={manyCourses}
               p={p}
               index={index}
               today={today}

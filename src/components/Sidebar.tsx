@@ -168,7 +168,7 @@ export function Sidebar() {
   const origin = useStore((s) => s.origin);
   const listMode = useStore((s) => s.listMode);
   const activeViewId = useStore((s) => s.activeViewId);
-  const activeCourseId = useStore((s) => s.activeCourseId);
+  const layoutCollapsed = useStore((s) => s.layout.collapsed);
   const [openTopics, setOpenTopics] = useState<Record<string, boolean>>({});
   const [showArchived, setShowArchived] = useState(false);
 
@@ -197,12 +197,14 @@ export function Sidebar() {
     };
   }, [problems]);
 
-  const activeCourse = courses.find((c) => c.id === activeCourseId) ?? courses.find((c) => !c.archived) ?? null;
-  const courseLectures = lectures.filter((l) => l.courseId === activeCourse?.id);
   const liveCourses = courses.filter((c) => !c.archived);
   const archived = courses.filter((c) => c.archived);
 
-  const isActive = (kind: string, id?: string) => listMode === "filter" && origin.kind === kind && (id === undefined || origin.id === id);
+  const isActive = (kind: string, id?: string) =>
+    listMode === "filter" && origin.kind === kind && (id === undefined || origin.id === id) && !origin.courseId;
+  const collapsed = (key: string, byDefault = false) => layoutCollapsed[key] ?? byDefault;
+  const toggle = (key: string, byDefault = false) =>
+    A.updateLayout({ collapsed: { ...get().layout.collapsed, [key]: !collapsed(key, byDefault) } });
 
   const courseMenu = (e: React.MouseEvent, id: string) => {
     const c = courses.find((x) => x.id === id)!;
@@ -210,6 +212,7 @@ export function Sidebar() {
     openContextMenu(e, [
       { label: t("Edit Course…"), onSelect: () => A.openDialog({ kind: "course", courseId: id }) },
       { label: t("Add Lectures…"), onSelect: () => A.openDialog({ kind: "lectures-bulk", courseId: id }) },
+      { label: t("New Topic…"), onSelect: () => A.openDialog({ kind: "topic" }) },
       { label: t("New Problem in Course"), onSelect: () => A.createProblem({ courseId: id }) },
       { separator: true },
       { label: t("Export Course…"), onSelect: () => A.openDialog({ kind: "export", problemIds: ids, title: courseLabel(c) }) },
@@ -265,22 +268,31 @@ export function Sidebar() {
     openContextMenu(e, items);
   };
 
-  const renderTopics = (parentId: string | null, depth: number): ReactNode[] =>
+  /** Topic tree limited to `visible`, with counts from `countOf`; clicking calls `onPick`. */
+  const renderTopicTree = (
+    parentId: string | null,
+    depth: number,
+    visible: Set<string>,
+    countOf: (id: string) => number | undefined,
+    activeFor: (id: string) => boolean,
+    onPick: (id: string) => void,
+    keyPrefix: string,
+  ): ReactNode[] =>
     topics
-      .filter((tp) => tp.parentId === parentId)
+      .filter((tp) => tp.parentId === parentId && visible.has(tp.id))
       .flatMap((tp) => {
-        const kids = topics.some((x) => x.parentId === tp.id);
+        const kids = topics.some((x) => x.parentId === tp.id && visible.has(x.id));
         const open = openTopics[tp.id] ?? true;
         return [
           <Item
-            key={tp.id}
+            key={`${keyPrefix}${tp.id}`}
             depth={depth}
             icon={<Hash size={13} />}
             label={tp.name}
             title={tp.description || tp.name}
-            count={counts.topic.get(tp.id)}
-            active={isActive("topic", tp.id)}
-            onClick={() => A.showTopic(tp.id)}
+            count={countOf(tp.id)}
+            active={activeFor(tp.id)}
+            onClick={() => onPick(tp.id)}
             onContext={(e) => topicMenu(e, tp)}
             onDropIds={(ids) => A.bulkUpdate(ids, { addTopicIds: [tp.id] }, t("Tagged {n} problem(s) with {name}", { n: ids.length, name: tp.name }))}
             chevron={
@@ -294,40 +306,154 @@ export function Sidebar() {
                 >
                   {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                 </span>
-              ) : depth > 0 ? (
-                <span className="chev" />
               ) : undefined
             }
           />,
-          ...(kids && open ? renderTopics(tp.id, depth + 1) : []),
+          ...(kids && open ? renderTopicTree(tp.id, depth + 1, visible, countOf, activeFor, onPick, keyPrefix) : []),
         ];
       });
+
+  /** A topic is shown together with its ancestors so the hierarchy stays readable. */
+  const withAncestors = (ids: Iterable<string>): Set<string> => {
+    const out = new Set<string>();
+    for (const id of ids) {
+      let cur: string | null = id;
+      while (cur && !out.has(cur)) {
+        out.add(cur);
+        cur = topics.find((x) => x.id === cur)?.parentId ?? null;
+      }
+    }
+    return out;
+  };
+
+  const SubHead = ({ id, label, count, byDefault }: { id: string; label: string; count: number; byDefault?: boolean }) => (
+    <button className="sb-sub" onClick={() => toggle(id, byDefault)} aria-expanded={!collapsed(id, byDefault)}>
+      {collapsed(id, byDefault) ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
+      <span className="grow">{label}</span>
+      <span className="count">{count}</span>
+    </button>
+  );
+
+  const courseBlock = (c: (typeof courses)[number]) => {
+    const live = problems.filter((p) => !p.deletedAt && p.courseId === c.id);
+    const lecs = lectures.filter((l) => l.courseId === c.id);
+    const topicCount = new Map<string, number>();
+    for (const p of live) for (const tid of p.topicIds) topicCount.set(tid, (topicCount.get(tid) ?? 0) + 1);
+    const courseTopics = withAncestors(topicCount.keys());
+    const courseSources = sources.filter((s) => s.courseId === c.id);
+    const key = `course:${c.id}`;
+    const open = !collapsed(key);
+    return (
+      <div key={c.id} className="sb-course">
+        <Item
+          icon={<GraduationCap size={15} />}
+          label={
+            <>
+              {c.code || c.title}
+              {c.code && c.title && <span className="sb-course-title"> {c.title}</span>}
+            </>
+          }
+          title={courseLabel(c)}
+          count={live.length}
+          active={isActive("course", c.id)}
+          onClick={() => A.showCourse(c.id)}
+          onContext={(e) => courseMenu(e, c.id)}
+          onDropIds={(ids) => A.bulkUpdate(ids, { courseId: c.id }, t("Moved {n} problem(s) to {name}", { n: ids.length, name: c.code || c.title }))}
+          className={c.archived ? "archived" : ""}
+          chevron={
+            <span
+              className="chev"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggle(key);
+              }}
+            >
+              {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            </span>
+          }
+          extra={c.isSample ? <span className="sample-tag">{t("sample")}</span> : undefined}
+        />
+        {open && (
+          <div className="sb-course-body">
+            {lecs.map((l) => (
+              <Item
+                key={l.id}
+                depth={1}
+                icon={<span className="lec-num">{l.number || "·"}</span>}
+                label={l.title || (l.number ? `${t("Lecture")} ${l.number}` : t("Untitled lecture"))}
+                title={lectureLabel(l) + (l.description ? ` · ${l.description}` : "") + (l.date ? ` · ${A.formatDate(l.date)}` : "")}
+                count={counts.lecture.get(l.id)}
+                active={isActive("lecture", l.id)}
+                onClick={() => A.showLecture(l.id)}
+                onContext={(e) => lectureMenu(e, l.id)}
+                onDropIds={(ids) =>
+                  A.bulkUpdate(ids, { addLectureIds: [l.id], courseId: l.courseId }, t("Added {n} problem(s) to {name}", { n: ids.length, name: lectureLabel(l) }))
+                }
+              />
+            ))}
+            {lecs.length === 0 && (
+              <div className="sb-empty indent">
+                <button onClick={() => A.openDialog({ kind: "lectures-bulk", courseId: c.id })}>{t("Add lectures")}</button>
+              </div>
+            )}
+            {courseTopics.size > 0 && (
+              <>
+                <SubHead id={`${key}:topics`} label={t("Topics")} count={topicCount.size} />
+                {!collapsed(`${key}:topics`) &&
+                  renderTopicTree(
+                    null,
+                    1,
+                    courseTopics,
+                    (id) => topicCount.get(id),
+                    (id) => listMode === "filter" && origin.kind === "topic" && origin.id === id && origin.courseId === c.id,
+                    (id) => A.showCourseTopic(c.id, id),
+                    `${c.id}:`,
+                  )}
+              </>
+            )}
+            {courseSources.length > 0 && (
+              <>
+                <SubHead id={`${key}:sources`} label={t("Sources")} count={courseSources.length} byDefault />
+                {!collapsed(`${key}:sources`, true) &&
+                  courseSources.map((src) => (
+                    <Item
+                      key={src.id}
+                      depth={1}
+                      icon={<SourceIcon src={src} />}
+                      label={src.title}
+                      title={`${src.title}${src.fileName ? `\n${src.fileName}` : ""}`}
+                      count={counts.source.get(src.id)}
+                      active={isActive("source", src.id)}
+                      onClick={() => A.showSource(src.id)}
+                      onContext={(e) => sourceMenu(e, src)}
+                    />
+                  ))}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Things that do not belong to any course get their own groups, shown only when they exist.
+  const usedTopics = new Set(problems.filter((p) => !p.deletedAt && p.courseId).flatMap((p) => p.topicIds));
+  const otherTopics = topics.filter((tp) => !usedTopics.has(tp.id));
+  const otherSources = sources.filter((s) => !s.courseId || !courses.some((c) => c.id === s.courseId));
+  const noCourse = problems.filter((p) => !p.deletedAt && !p.courseId).length;
 
   return (
     <aside className="sidebar" aria-label={t("Library navigation")}>
       <div className="sidebar-scroll">
         <Item icon={<BookOpen size={15} />} label={t("All Problems")} count={counts.all} active={isActive("all")} onClick={A.showAll} />
-        <Item
-          icon={<Inbox size={15} />}
-          label={t("Review Queue")}
-          count={counts.review}
-          active={listMode === "review"}
-          onClick={A.showReview}
-        />
+        <Item icon={<Inbox size={15} />} label={t("Review Queue")} count={counts.review} active={listMode === "review"} onClick={A.showReview} />
         <Item icon={<Clock3 size={15} />} label={t("Recently Edited")} active={listMode === "recent"} onClick={A.showRecent} />
         {counts.importReview > 0 && (
-          <Item
-            icon={<AlertTriangle size={14} />}
-            label={t("Needs Import Review")}
-            count={counts.importReview}
-            active={isActive("import-review")}
-            onClick={A.showImportReview}
-          />
+          <Item icon={<AlertTriangle size={14} />} label={t("Needs Import Review")} count={counts.importReview} active={isActive("import-review")} onClick={A.showImportReview} />
         )}
-        <Item icon={<Trash2 size={14} />} label={t("Trash")} count={counts.trash || undefined} active={listMode === "trash"} onClick={A.showTrash} />
 
         <Section
-          id="courses"
+          id="course-tree"
           title={t("Courses")}
           actions={
             <button className="icon-btn sm" title={t("New Course…")} onClick={() => A.openDialog({ kind: "course" })}>
@@ -335,42 +461,14 @@ export function Sidebar() {
             </button>
           }
         >
-          {liveCourses.map((c) => (
-            <Item
-              key={c.id}
-              icon={<GraduationCap size={15} />}
-              label={c.code || c.title}
-              title={courseLabel(c)}
-              count={counts.course.get(c.id)}
-              active={isActive("course", c.id)}
-              onClick={() => A.showCourse(c.id)}
-              onContext={(e) => courseMenu(e, c.id)}
-              onDropIds={(ids) => A.bulkUpdate(ids, { courseId: c.id }, t("Moved {n} problem(s) to {name}", { n: ids.length, name: c.code || c.title }))}
-              extra={c.isSample ? <span className="sample-tag">{t("sample")}</span> : undefined}
-            />
-          ))}
+          {liveCourses.map(courseBlock)}
+          {noCourse > 0 && (
+            <Item icon={<GraduationCap size={15} />} label={t("No course")} className="archived" count={noCourse} active={isActive("unassigned")} onClick={A.showUnassigned} />
+          )}
           {archived.length > 0 && (
             <>
-              <Item
-                icon={<Archive size={14} />}
-                label={t("Archived ({n})", { n: archived.length })}
-                className="archived"
-                onClick={() => setShowArchived(!showArchived)}
-              />
-              {showArchived &&
-                archived.map((c) => (
-                  <Item
-                    key={c.id}
-                    depth={1}
-                    icon={<GraduationCap size={14} />}
-                    label={c.code || c.title}
-                    className="archived"
-                    count={counts.course.get(c.id)}
-                    active={isActive("course", c.id)}
-                    onClick={() => A.showCourse(c.id)}
-                    onContext={(e) => courseMenu(e, c.id)}
-                  />
-                ))}
+              <Item icon={<Archive size={14} />} label={t("Archived ({n})", { n: archived.length })} className="archived" onClick={() => setShowArchived(!showArchived)} />
+              {showArchived && archived.map(courseBlock)}
             </>
           )}
           {courses.length === 0 && (
@@ -380,126 +478,73 @@ export function Sidebar() {
           )}
         </Section>
 
-        <Section
-          id="lectures"
-          title={t("Lectures")}
-          actions={
-            activeCourse && (
-              <button className="icon-btn sm" title={t("Add Lectures…")} onClick={() => A.openDialog({ kind: "lectures-bulk", courseId: activeCourse.id })}>
+        {otherTopics.length > 0 && (
+          <Section
+            id="topics"
+            title={courses.length ? t("Other Topics") : t("Topics")}
+            actions={
+              <button className="icon-btn sm" title={t("New Topic…")} onClick={() => A.openDialog({ kind: "topic" })}>
                 <Plus size={14} />
               </button>
-            )
-          }
-        >
-          {liveCourses.length > 1 && (
-            <div className="sb-course-switch">
-              <select
-                className="select"
-                value={activeCourse?.id ?? ""}
-                aria-label={t("Course")}
-                onChange={(e) => useStore.setState({ activeCourseId: e.target.value })}
-              >
-                {courses.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.code ? `${c.code}${c.title ? ` — ${c.title}` : ""}` : c.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-          {courseLectures.map((l) => (
-            <Item
-              key={l.id}
-              icon={<span className="lec-num">{l.number || "·"}</span>}
-              label={l.title || (l.number ? `${t("Lecture")} ${l.number}` : t("Untitled lecture"))}
-              title={lectureLabel(l) + (l.date ? ` · ${A.formatDate(l.date)}` : "")}
-              count={counts.lecture.get(l.id)}
-              active={isActive("lecture", l.id)}
-              onClick={() => A.showLecture(l.id)}
-              onContext={(e) => lectureMenu(e, l.id)}
-              onDropIds={(ids) =>
-                A.bulkUpdate(
-                  ids,
-                  { addLectureIds: [l.id], courseId: l.courseId },
-                  t("Added {n} problem(s) to {name}", { n: ids.length, name: lectureLabel(l) }),
-                )
-              }
-            />
-          ))}
-          {activeCourse && courseLectures.length === 0 && (
-            <div className="sb-empty">
-              <button onClick={() => A.openDialog({ kind: "lectures-bulk", courseId: activeCourse.id })}>{t("Add lectures")}</button>
-            </div>
-          )}
-          {!activeCourse && <div className="sb-empty">{t("Create a course first.")}</div>}
-        </Section>
+            }
+          >
+            {otherTopics.map((tp) => (
+              <Item
+                key={tp.id}
+                icon={<Hash size={13} />}
+                label={tp.name}
+                count={counts.topic.get(tp.id)}
+                active={isActive("topic", tp.id)}
+                onClick={() => A.showTopic(tp.id)}
+                onContext={(e) => topicMenu(e, tp)}
+                onDropIds={(ids) => A.bulkUpdate(ids, { addTopicIds: [tp.id] })}
+              />
+            ))}
+          </Section>
+        )}
 
-        <Section
-          id="topics"
-          title={t("Topics")}
-          actions={
-            <button className="icon-btn sm" title={t("New Topic…")} onClick={() => A.openDialog({ kind: "topic" })}>
-              <Plus size={14} />
-            </button>
-          }
-        >
-          {renderTopics(null, 0)}
-          {topics.length === 0 && (
-            <div className="sb-empty">
-              <button onClick={() => A.openDialog({ kind: "topic" })}>{t("Add a topic")}</button>
-            </div>
-          )}
-        </Section>
+        {otherSources.length > 0 && (
+          <Section id="sources" title={courses.length ? t("Other Sources") : t("Sources")}>
+            {otherSources.map((src) => (
+              <Item
+                key={src.id}
+                icon={<SourceIcon src={src} />}
+                label={src.title}
+                title={`${src.title}${src.fileName ? `\n${src.fileName}` : ""}`}
+                count={counts.source.get(src.id)}
+                active={isActive("source", src.id)}
+                onClick={() => A.showSource(src.id)}
+                onContext={(e) => sourceMenu(e, src)}
+                extra={src.isSample ? <span className="sample-tag">{t("sample")}</span> : undefined}
+              />
+            ))}
+          </Section>
+        )}
 
-        <Section
-          id="sources"
-          title={t("Sources")}
-          actions={
-            <button className="icon-btn sm" title={t("Import Exercises…")} onClick={() => A.pickAndImport()}>
-              <Plus size={14} />
-            </button>
-          }
-        >
-          {sources.map((src) => (
-            <Item
-              key={src.id}
-              icon={<SourceIcon src={src} />}
-              label={src.title}
-              title={`${src.title}${src.fileName ? `\n${src.fileName}` : ""}`}
-              count={counts.source.get(src.id)}
-              active={isActive("source", src.id)}
-              onClick={() => A.showSource(src.id)}
-              onContext={(e) => sourceMenu(e, src)}
-              extra={src.isSample ? <span className="sample-tag">{t("sample")}</span> : undefined}
-            />
-          ))}
-          {sources.length === 0 && (
-            <div className="sb-empty">
-              <button onClick={() => A.pickAndImport()}>{t("Import a document")}</button>
-            </div>
-          )}
-        </Section>
-
-        <Section id="views" title={t("Saved Views")}>
-          {views.map((v) => (
-            <Item
-              key={v.id}
-              icon={<Filter size={13} />}
-              label={v.name}
-              active={activeViewId === v.id}
-              onClick={() => A.showView(v.id)}
-              onContext={(e) =>
-                openContextMenu(e, [
-                  { label: t("Update with Current Filter"), onSelect: () => A.saveView(v.name, v.id) },
-                  { label: t("Rename…"), onSelect: () => A.openDialog({ kind: "save-view", viewId: v.id }) },
-                  { separator: true },
-                  { label: t("Delete View…"), danger: true, onSelect: () => A.deleteView(v.id) },
-                ])
-              }
-            />
-          ))}
-          {views.length === 0 && <div className="sb-empty">{t("Filter the list, then save it as a view.")}</div>}
-        </Section>
+        {views.length > 0 && (
+          <Section id="views" title={t("Saved Views")}>
+            {views.map((v) => (
+              <Item
+                key={v.id}
+                icon={<Filter size={13} />}
+                label={v.name}
+                active={activeViewId === v.id}
+                onClick={() => A.showView(v.id)}
+                onContext={(e) =>
+                  openContextMenu(e, [
+                    { label: t("Update with Current Filter"), onSelect: () => A.saveView(v.name, v.id) },
+                    { label: t("Rename…"), onSelect: () => A.openDialog({ kind: "save-view", viewId: v.id }) },
+                    { separator: true },
+                    { label: t("Delete View…"), danger: true, onSelect: () => A.deleteView(v.id) },
+                  ])
+                }
+              />
+            ))}
+          </Section>
+        )}
+      </div>
+      <div className="sidebar-foot">
+        <Item icon={<Trash2 size={14} />} label={t("Trash")} count={counts.trash || undefined} active={listMode === "trash"} onClick={A.showTrash} />
       </div>
     </aside>
   );

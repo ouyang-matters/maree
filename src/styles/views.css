@@ -214,6 +214,39 @@
   align-items: center;
   gap: 8px;
 }
+.pv-meta-extra {
+  margin-top: -2px;
+}
+.pv-details-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  flex: 1 1 0;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 12px;
+  text-align: left;
+}
+.meta-line .chip-link {
+  height: auto;
+  min-height: 22px;
+  max-width: 100%;
+  padding: 2px 8px;
+  white-space: normal;
+  text-align: left;
+}
+.pv-details-toggle:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+.pv-summary {
+  min-width: 0;
+}
 .status-seg button span {
   font-size: 12px;
 }
