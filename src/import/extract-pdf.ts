@@ -21,7 +21,9 @@ interface Item {
   size: number;
 }
 
-type Script = "base" | "sup" | "sub";
+/** Position of a glyph relative to its line: small raised/lowered glyphs are scripts;
+ * full-size glyphs above/below the baseline belong to fractions, radicals or big delimiters. */
+type Script = "base" | "sup" | "sub" | "raised" | "lowered";
 
 interface Line {
   y: number;
@@ -29,6 +31,7 @@ interface Line {
   minX: number;
   maxX: number;
   items: (Item & { script: Script })[];
+  baselineFixed: boolean;
 }
 
 function median(xs: number[]): number {
@@ -43,93 +46,127 @@ function percentile(xs: number[], p: number): number {
   return s[Math.min(s.length - 1, Math.floor(s.length * p))];
 }
 
-function buildLines(items: Item[], body: number): Line[] {
-  const sorted = [...items].sort((a, b) => b.y - a.y || a.x - b.x);
+/**
+ * Builds lines in content-stream order. TeX (and most generators) emit glyphs in reading
+ * order, so a glyph that is merely raised or lowered (a radical sign, a numerator, a big
+ * parenthesis, an exponent) stays in the line it belongs to. A new line starts only on a
+ * genuine carriage return: moving down and back to the left, or a large vertical jump.
+ */
+function buildLines(items: Item[], body: number, textWidth: number): Line[] {
   const lines: Line[] = [];
-  const small: Item[] = [];
-  for (const it of sorted) {
-    if (it.size < body * 0.82) {
-      small.push(it);
-      continue;
-    }
-    let target: Line | undefined;
-    for (let i = lines.length - 1; i >= Math.max(0, lines.length - 4); i--) {
-      const l = lines[i];
-      if (Math.abs(l.y - it.y) <= 0.4 * Math.max(l.size, it.size)) {
-        target = l;
-        break;
+  let cur: Line | null = null;
+  let prev: Item | null = null;
+  for (const it of items) {
+    const blank = !it.str.trim();
+    if (cur && prev) {
+      const size = Math.max(prev.size, body * 0.82);
+      const dy = it.y - prev.y;
+      const backwards = it.x < prev.x + prev.w - 0.3 * textWidth || it.x <= cur.minX + 0.6 * size;
+      const newLine = dy < -2 * size || dy > 2 * size || (Math.abs(dy) > 0.9 * size && backwards);
+      if (!newLine || blank) {
+        cur.items.push({ ...it, script: "base" });
+        if (!blank) {
+          cur.minX = Math.min(cur.minX, it.x);
+          cur.maxX = Math.max(cur.maxX, it.x + it.w);
+          prev = it;
+        }
+        continue;
       }
     }
-    if (!target) {
-      target = { y: it.y, size: it.size, minX: it.x, maxX: it.x + it.w, items: [] };
-      lines.push(target);
-    }
-    target.items.push({ ...it, script: "base" });
-    target.size = Math.max(target.size, it.size);
-    target.minX = Math.min(target.minX, it.x);
-    target.maxX = Math.max(target.maxX, it.x + it.w);
+    if (blank) continue;
+    cur = { y: it.y, size: it.size, minX: it.x, maxX: it.x + it.w, items: [{ ...it, script: "base" }], baselineFixed: false };
+    lines.push(cur);
+    prev = it;
   }
-  for (const it of small) {
-    let best: Line | undefined;
-    let bestDy = Infinity;
-    for (const l of lines) {
+  for (const l of lines) {
+    // Baseline and size: the height carrying most of the full-size text.
+    const weight = new Map<number, number>();
+    let maxSize = 0;
+    for (const it of l.items) if (it.str.trim()) maxSize = Math.max(maxSize, it.size);
+    for (const it of l.items) {
+      if (!it.str.trim() || it.size < maxSize * 0.82) continue;
+      const k = Math.round(it.y * 2) / 2;
+      weight.set(k, (weight.get(k) ?? 0) + it.str.trim().length);
+    }
+    let best = l.y;
+    let bw = -1;
+    for (const [k, w] of weight) if (w > bw) (bw = w), (best = k);
+    l.y = best;
+    l.size = maxSize || l.size;
+    for (const it of l.items) {
+      if (!it.str.trim()) continue;
       const dy = it.y - l.y;
-      if (dy < -0.55 * l.size || dy > 0.75 * l.size) continue;
-      if (it.x < l.minX - l.size || it.x > l.maxX + 2 * l.size) continue;
-      if (Math.abs(dy) < bestDy) {
-        bestDy = Math.abs(dy);
-        best = l;
-      }
-    }
-    if (best) {
-      const dy = it.y - best.y;
-      const script: Script = dy > 0.12 * best.size ? "sup" : dy < -0.08 * best.size ? "sub" : "base";
-      best.items.push({ ...it, script });
-      best.minX = Math.min(best.minX, it.x);
-      best.maxX = Math.max(best.maxX, it.x + it.w);
-    } else {
-      lines.push({ y: it.y, size: it.size, minX: it.x, maxX: it.x + it.w, items: [{ ...it, script: "base" }] });
+      if (it.size < l.size * 0.82) it.script = dy > 0.12 * l.size ? "sup" : dy < -0.08 * l.size ? "sub" : "base";
+      else it.script = dy > 0.3 * l.size ? "raised" : dy < -0.3 * l.size ? "lowered" : "base";
     }
   }
-  lines.sort((a, b) => b.y - a.y);
-  for (const l of lines) l.items.sort((a, b) => a.x - b.x);
   return lines;
 }
 
+interface Group {
+  script: Script;
+  text: string;
+  x0: number;
+  x1: number;
+}
+
 function lineTexts(l: Line): { plain: string; marked: string; scripts: boolean } {
+  // Plain text: glyphs in reading order, with spaces where the layout has gaps.
   let plain = "";
-  let marked = "";
-  let scripts = false;
-  let prev: (Item & { script: Script }) | null = null;
-  let open: Script = "base";
-  const close = () => {
-    if (open !== "base") marked += "}";
-    open = "base";
-  };
+  let prev: Item | null = null;
   for (const it of l.items) {
     const str = normalizeExtracted(it.str);
     if (prev) {
       const gap = it.x - (prev.x + prev.w);
-      const needSpace = gap > 0.15 * l.size && !/\s$/.test(prev.str) && !/^\s/.test(str);
-      if (needSpace) {
-        plain += " ";
-        if (it.script === open) marked += " ";
-      }
-    }
-    if (it.script !== open) {
-      close();
-      if (it.script !== "base") {
-        scripts = true;
-        marked += it.script === "sup" ? "^{" : "_{";
-        open = it.script;
-      } else if (prev && it.x - (prev.x + prev.w) > 0.15 * l.size) marked += " ";
+      if ((gap > 0.15 * l.size || gap < -0.5 * l.size) && !/\s$/.test(plain) && !/^\s/.test(str)) plain += " ";
     }
     plain += str;
-    marked += it.script === "base" ? str : str.trim();
-    prev = { ...it, str };
+    if (str.trim()) prev = it;
   }
-  close();
-  return { plain: plain.replace(/\s+/g, " ").trim(), marked: marked.replace(/\s+/g, " ").trim(), scripts };
+
+  // Assisted text: group consecutive glyphs by position and rebuild scripts and fractions.
+  const groups: Group[] = [];
+  for (const it of l.items) {
+    const str = normalizeExtracted(it.str);
+    const g = groups[groups.length - 1];
+    const script = str.trim() ? it.script : (g?.script ?? "base");
+    if (g && g.script === script && it.x >= g.x1 - 0.5 * l.size) {
+      const gap = it.x - g.x1;
+      g.text += (gap > 0.15 * l.size && !/\s$/.test(g.text) && !/^\s/.test(str) ? " " : "") + str;
+      if (str.trim()) g.x1 = Math.max(g.x1, it.x + it.w);
+    } else {
+      groups.push({ script, text: str, x0: it.x, x1: it.x + it.w });
+    }
+  }
+  let marked = "";
+  let scripts = false;
+  for (let i = 0; i < groups.length; i++) {
+    const g = groups[i];
+    const next = groups[i + 1];
+    const text = g.text.trim();
+    const prevG = groups[i - 1];
+    const spaced = prevG && g.x0 - prevG.x1 > 0.15 * l.size ? " " : "";
+    if (!text) {
+      marked += " ";
+      continue;
+    }
+    if ((g.script === "sup" || g.script === "sub") && !(g.script === "sup" && next?.script === "sub" && next.x0 < g.x1 && next.x1 > g.x0)) {
+      scripts = true;
+      marked += `${g.script === "sup" ? "^" : "_"}{${text}}`;
+    } else if (
+      ((g.script === "raised" && next?.script === "lowered") || (g.script === "sup" && next?.script === "sub")) &&
+      next.x0 < g.x1 &&
+      next.x1 > g.x0
+    ) {
+      // A numerator immediately followed by an overlapping denominator (display or inline fraction).
+      scripts = true;
+      marked += `${spaced}\\frac{${text}}{${next.text.trim()}}`;
+      i++;
+    } else {
+      marked += spaced + text;
+    }
+  }
+  return { plain: plain.replace(/\s+/g, " ").trim(), marked: marked.replace(/\s+/g, " ").trim(), scripts: scripts || l.items.some((x) => x.script === "raised" || x.script === "lowered") };
 }
 
 const PAGE_NUMBER = /^(page\s*)?\d{1,4}(\s*(of|\/)\s*\d{1,4})?$/i;
@@ -148,7 +185,7 @@ export async function extractPdf(
   const doc = await pdfjs.getDocument({ data: bytes.slice(), isEvalSupported: false, disableFontFace: true, useSystemFonts: false })
     .promise;
   const numPages = doc.numPages;
-  const pageItems: { items: Item[]; height: number }[] = [];
+  const pageItems: { items: Item[]; height: number; width: number }[] = [];
   const sizeWeights = new Map<number, number>();
   for (let p = 1; p <= doc.numPages; p++) {
     const page = await doc.getPage(p);
@@ -158,6 +195,7 @@ export async function extractPdf(
     for (const raw of tc.items) {
       if (!("str" in raw)) continue;
       if (!raw.str) continue;
+      // Keep stream order: it is reading order for TeX-generated documents.
       const t = raw.transform as number[];
       const size = Math.hypot(t[2], t[3]) || raw.height || 10;
       if (size < 2) continue;
@@ -165,7 +203,7 @@ export async function extractPdf(
       const key = Math.round(size * 2) / 2;
       sizeWeights.set(key, (sizeWeights.get(key) ?? 0) + raw.str.length);
     }
-    pageItems.push({ items, height: vp.height });
+    pageItems.push({ items, height: vp.height, width: vp.width });
     page.cleanup();
     onProgress?.(p, doc.numPages);
   }
@@ -187,8 +225,8 @@ export async function extractPdf(
   // Header/footer lines repeated on many pages (e.g. "MATH 147 — Fall 2026").
   const edgeCounts = new Map<string, number>();
   const perPage: { page: number; lines: Line[]; height: number }[] = [];
-  pageItems.forEach(({ items, height }, idx) => {
-    const lines = buildLines(items, body);
+  pageItems.forEach(({ items, height, width }, idx) => {
+    const lines = buildLines(items, body, width * 0.7);
     perPage.push({ page: idx + 1, lines, height });
     const edge = new Set<string>();
     for (const l of lines) {

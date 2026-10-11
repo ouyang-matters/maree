@@ -5,8 +5,11 @@
   "description": "Marée — a local-first mathematical problem library and proof-practice workspace.",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/copy-pdfjs-assets.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/copy-pdfjs-assets.mjs",
     "build": "tsc --noEmit && vite build",
+    "prebuild:web": "node scripts/copy-pdfjs-assets.mjs",
     "build:web": "tsc --noEmit && vite build --outDir dist-web",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",

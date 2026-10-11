@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/maree.svg" />
+    <title>Marée</title>
+    <script>
+      // Apply the last theme before anything paints, so startup never flashes.
+      try {
+        var th = localStorage.getItem("maree-theme");
+        if (th) document.documentElement.dataset.theme = th;
+      } catch (e) {}
+    </script>
+    <style>
+      html { background: #fbf9f7; }
+      html[data-theme="maree-dark"] { background: #1c1a1e; }
+      html[data-theme="black-gold"] { background: #121212; }
+      html[data-theme="waterloo"] { background: #ffffff; }
+      .splash { position: fixed; inset: 0; display: grid; place-items: center; z-index: 1000; transition: opacity .35s ease; color: #2b2629; }
+      html[data-theme="maree-dark"] .splash, html[data-theme="black-gold"] .splash { color: #ebe5e9; }
+      .splash.hide { opacity: 0; pointer-events: none; }
+      .splash .wordmark { font: italic 500 46px "Cormorant Garamond", Georgia, serif; text-align: center; }
+      .splash .wave { display: block; margin: 10px auto 0; color: #b03a6c; }
+    </style>
+  </head>
+  <body>
+    <div id="splash" class="splash" aria-hidden="true">
+      <div>
+        <div class="wordmark">Marée</div>
+        <svg class="wave" width="64" height="10" viewBox="0 0 64 10"><path d="M1 5c5-4 10-4 15 0s10 4 15 0 10-4 15 0 10 4 15 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
+      </div>
+    </div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

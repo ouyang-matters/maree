@@ -7,3 +7,4 @@ src-tauri/gen/
 .DS_Store
 e2e-data/
 test-results/
+public/pdfjs/

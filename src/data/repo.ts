@@ -233,7 +233,7 @@ SELECT p.id, p.title, substr(p.statement, 1, 600) AS preview, p.course_id, p.sou
   (SELECT COUNT(*) FROM problem_parts x WHERE x.problem_id = p.id) AS part_count,
   (SELECT COUNT(*) FROM problem_parts x WHERE x.problem_id = p.id AND x.status IN ('completed','mastered')) AS parts_done,
   (SELECT COUNT(*) FROM attempts a WHERE a.problem_id = p.id) AS attempt_count,
-  (SELECT a.outcome FROM attempts a WHERE a.problem_id = p.id ORDER BY a.created_at DESC LIMIT 1) AS last_outcome
+  (SELECT a.outcome FROM attempts a WHERE a.problem_id = p.id ORDER BY a.created_at DESC, a.id DESC LIMIT 1) AS last_outcome
 FROM problems p`;
 
 function mapSummary(r: Row, lectures: string[], topics: string[]): ProblemSummary {
@@ -778,8 +778,8 @@ export class Repo {
       this.db.select<{ lecture_id: string }>("SELECT lecture_id FROM problem_lectures WHERE problem_id = ?", [id]),
       this.db.select<{ topic_id: string }>("SELECT topic_id FROM problem_topics WHERE problem_id = ?", [id]),
       this.db.select("SELECT * FROM problem_parts WHERE problem_id = ? ORDER BY sort_order, label", [id]),
-      this.db.select("SELECT * FROM attempts WHERE problem_id = ? ORDER BY created_at DESC", [id]),
-      this.db.select("SELECT * FROM history WHERE problem_id = ? ORDER BY created_at DESC", [id]),
+      this.db.select("SELECT * FROM attempts WHERE problem_id = ? ORDER BY created_at DESC, id DESC", [id]),
+      this.db.select("SELECT * FROM history WHERE problem_id = ? ORDER BY created_at DESC, id DESC", [id]),
       this.db.select("SELECT * FROM attachments WHERE problem_id = ? ORDER BY created_at", [id]),
     ]);
     return {

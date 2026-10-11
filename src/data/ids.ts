@@ -10,20 +10,14 @@ function randomChars(n: number): string {
   return out;
 }
 
-let lastTime = 0;
-let counter = 0;
+let last = 0;
 
+/** Strictly increasing within a session, so ids double as a creation-order tiebreaker. */
 export function newId(prefix: string): string {
-  let t = Date.now();
-  if (t <= lastTime) {
-    counter++;
-    t = lastTime;
-  } else {
-    lastTime = t;
-    counter = 0;
-  }
+  const t = Math.max(Date.now(), last + 1);
+  last = t;
   let time = "";
-  let v = t + counter;
+  let v = t;
   for (let i = 0; i < 9; i++) {
     time = ALPHABET[v % 32] + time;
     v = Math.floor(v / 32);

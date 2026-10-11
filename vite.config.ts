@@ -22,9 +22,6 @@ export default defineConfig({
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
     chunkSizeWarningLimit: 2500,
   },
-  optimizeDeps: {
-    exclude: ["sql.js"],
-  },
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],

@@ -1,0 +1,171 @@
+/* Design tokens. Every colour in the app comes from these variables. */
+
+:root,
+[data-theme="maree"] {
+  color-scheme: light;
+  --bg: #fbf9f7;
+  --bg-panel: #f5f2ef;
+  --bg-sunken: #efebe7;
+  --bg-elev: #ffffff;
+  --bg-input: #ffffff;
+  --bg-hover: rgba(70, 40, 55, 0.055);
+  --bg-active: rgba(176, 58, 108, 0.085);
+  --bg-selected: rgba(176, 58, 108, 0.13);
+  --border: #e7e1dc;
+  --border-strong: #d6cec8;
+  --text: #2b2629;
+  --text-2: #5f575c;
+  --text-3: #968c91;
+  --accent: #b03a6c;
+  --accent-2: #8f2c57;
+  --accent-soft: #f7e7ee;
+  --accent-text: #ffffff;
+  --focus-ring: rgba(176, 58, 108, 0.36);
+  --danger: #b3402f;
+  --danger-soft: #f8e5e1;
+  --success: #3f7a5a;
+  --warning: #a8701c;
+  --warning-soft: #f8eedb;
+  --st-not_started: #aaa1a6;
+  --st-in_progress: #b7832f;
+  --st-completed: #3f7a5a;
+  --st-needs_review: #c4572f;
+  --st-mastered: #b03a6c;
+  --code-bg: #f3efeb;
+  --shadow-1: 0 1px 2px rgba(40, 25, 35, 0.06), 0 1px 1px rgba(40, 25, 35, 0.03);
+  --shadow-2: 0 10px 30px rgba(40, 25, 35, 0.13), 0 2px 8px rgba(40, 25, 35, 0.06);
+  --scrollbar: rgba(70, 40, 55, 0.2);
+  --titlebar-bg: #f1ede9;
+  --close-hover: #c42b1c;
+  --pdf-page-shadow: 0 1px 3px rgba(40, 25, 35, 0.18);
+}
+
+[data-theme="maree-dark"] {
+  color-scheme: dark;
+  --bg: #1c1a1e;
+  --bg-panel: #19171b;
+  --bg-sunken: #151317;
+  --bg-elev: #242127;
+  --bg-input: #1f1c22;
+  --bg-hover: rgba(255, 235, 245, 0.05);
+  --bg-active: rgba(226, 128, 170, 0.11);
+  --bg-selected: rgba(226, 128, 170, 0.17);
+  --border: #2d2930;
+  --border-strong: #3c3641;
+  --text: #ebe5e9;
+  --text-2: #ada3a9;
+  --text-3: #7c7278;
+  --accent: #e283ab;
+  --accent-2: #eea0c1;
+  --accent-soft: rgba(226, 131, 171, 0.14);
+  --accent-text: #1c1a1e;
+  --focus-ring: rgba(226, 131, 171, 0.42);
+  --danger: #e2735f;
+  --danger-soft: rgba(226, 115, 95, 0.14);
+  --success: #74b48e;
+  --warning: #d9a650;
+  --warning-soft: rgba(217, 166, 80, 0.13);
+  --st-not_started: #7c7278;
+  --st-in_progress: #d6a554;
+  --st-completed: #74b48e;
+  --st-needs_review: #e5845f;
+  --st-mastered: #e283ab;
+  --code-bg: #232026;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-2: 0 12px 34px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.35);
+  --scrollbar: rgba(255, 235, 245, 0.16);
+  --titlebar-bg: #141216;
+  --pdf-page-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="waterloo"] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --bg-panel: #fbf6f9;
+  --bg-sunken: #f5edf2;
+  --bg-elev: #ffffff;
+  --bg-input: #ffffff;
+  --bg-hover: rgba(120, 0, 70, 0.05);
+  --bg-active: rgba(196, 0, 122, 0.08);
+  --bg-selected: rgba(196, 0, 122, 0.12);
+  --border: #ece1e8;
+  --border-strong: #dccbd6;
+  --text: #24181f;
+  --text-2: #5d4b56;
+  --text-3: #988691;
+  --accent: #c4007a;
+  --accent-2: #9c0062;
+  --accent-soft: #fbe2f0;
+  --accent-text: #ffffff;
+  --focus-ring: rgba(196, 0, 122, 0.32);
+  --danger: #b3402f;
+  --danger-soft: #f8e5e1;
+  --success: #2f7a54;
+  --warning: #a8701c;
+  --warning-soft: #f8eedb;
+  --st-not_started: #a8979f;
+  --st-in_progress: #b47d1e;
+  --st-completed: #2f7a54;
+  --st-needs_review: #d0532a;
+  --st-mastered: #c4007a;
+  --code-bg: #f8f1f5;
+  --shadow-1: 0 1px 2px rgba(60, 0, 35, 0.07);
+  --shadow-2: 0 10px 30px rgba(60, 0, 35, 0.13), 0 2px 8px rgba(60, 0, 35, 0.06);
+  --scrollbar: rgba(120, 0, 70, 0.2);
+  --titlebar-bg: #f6eef3;
+  --pdf-page-shadow: 0 1px 3px rgba(60, 0, 35, 0.18);
+}
+
+[data-theme="black-gold"] {
+  color-scheme: dark;
+  --bg: #121212;
+  --bg-panel: #0e0e0e;
+  --bg-sunken: #0a0a0a;
+  --bg-elev: #1b1b1b;
+  --bg-input: #161616;
+  --bg-hover: rgba(255, 245, 220, 0.05);
+  --bg-active: rgba(226, 179, 60, 0.1);
+  --bg-selected: rgba(226, 179, 60, 0.16);
+  --border: #262524;
+  --border-strong: #353330;
+  --text: #f1eee6;
+  --text-2: #b5af9f;
+  --text-3: #7e786b;
+  --accent: #e2b33c;
+  --accent-2: #f0c85e;
+  --accent-soft: rgba(226, 179, 60, 0.13);
+  --accent-text: #121212;
+  --focus-ring: rgba(226, 179, 60, 0.42);
+  --danger: #e2735f;
+  --danger-soft: rgba(226, 115, 95, 0.14);
+  --success: #8bbf7a;
+  --warning: #e2b33c;
+  --warning-soft: rgba(226, 179, 60, 0.12);
+  --st-not_started: #7e786b;
+  --st-in_progress: #d9a842;
+  --st-completed: #8bbf7a;
+  --st-needs_review: #e5845f;
+  --st-mastered: #f0c85e;
+  --code-bg: #1a1a1a;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-2: 0 12px 34px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
+  --scrollbar: rgba(255, 245, 220, 0.16);
+  --titlebar-bg: #0a0a0a;
+  --pdf-page-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+}
+
+:root {
+  --font-ui: "Inter Variable", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-prose: "Source Serif 4 Variable", "Source Serif 4", Charter, Georgia, serif;
+  --font-mono: "JetBrains Mono Variable", "Cascadia Mono", Consolas, monospace;
+  --font-display: "Cormorant Garamond", "Source Serif 4 Variable", Georgia, serif;
+  --prose-size: 16px;
+  --editor-font-size: 13.5px;
+  --radius-s: 4px;
+  --radius: 6px;
+  --radius-l: 9px;
+  --titlebar-h: 38px;
+  --statusbar-h: 24px;
+  --tabs-h: 34px;
+  --row-h: 30px;
+}

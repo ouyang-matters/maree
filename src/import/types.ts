@@ -90,16 +90,19 @@ export interface Candidate {
   include: boolean;
   number: string;
   title: string;
-  /** Statement used when parts are split out. */
+  /** Working copy of the statement (what will be saved). */
   statement: string;
-  /** Statement with parts kept inline (used when `splitParts` is false). */
+  /** Plain statement with parts inline; used for duplicate detection. */
   wholeStatement: string;
+  /** The text exactly as segmented (before any user edits or assisted conversion). */
+  plain: { statement: string; parts: CandidatePart[] };
   /** Exact text as extracted; stored as provenance and never modified. */
   rawText: string;
   /** PDF only: assisted conversion of the statement, offered to the user. */
   assistedStatement: string | null;
   assistedParts: CandidatePart[] | null;
   usingAssisted: boolean;
+  /** Working copy of the parts (empty when `splitParts` is false). */
   parts: CandidatePart[];
   splitParts: boolean;
   referenceSolution: string;

@@ -93,7 +93,14 @@ export function garbledRatio(s: string): number {
   return bad / total;
 }
 
+const OPERATOR_NAMES = /(?<![\\A-Za-z])(lim\s*sup|lim\s*inf|lim|sup|inf|max|min|log|ln|exp|sin|cos|tan|det|gcd|deg|dim|ker)(?![A-Za-z])/g;
+
 function convertSymbols(run: string): string {
+  // Operator names become commands: "lim sup" → \limsup, "lim" → \lim (with a space before letters).
+  run = run.replace(OPERATOR_NAMES, (m: string, _g: string, offset: number, all: string) => {
+    const cmd = "\\" + m.replace(/\s+/g, "");
+    return /[A-Za-z0-9]/.test(all[offset + m.length] ?? "") ? `${cmd} ` : cmd;
+  });
   let out = "";
   const chars = [...run];
   for (let i = 0; i < chars.length; i++) {
@@ -127,10 +134,36 @@ function convertSymbols(run: string): string {
 const STRONG = /[Ͱ-Ͽ∀-⋿←-⇿⟀-⟯⦀-⧿⁰-₟ℝℕℤℚℂℙℓℵ√∞±×÷·′⟨⟩⌊⌋⌈⌉‖=<>^_|]|\d[a-zA-Z]|[a-zA-Z]\d/u;
 const WORDISH = /^[A-Za-z]{2,}[.,;:!?)]*$/;
 
+/** Splits on whitespace outside brace groups, keeping the whitespace tokens ("\frac{a + b}{c}" is one token). */
+function splitTokens(line: string): string[] {
+  const out: string[] = [];
+  let cur = "";
+  let depth = 0;
+  let ws = false;
+  for (const ch of line) {
+    const isWs = /\s/.test(ch) && depth === 0;
+    if (cur && isWs !== ws) {
+      out.push(cur);
+      cur = "";
+    }
+    ws = isWs;
+    if (ch === "{") depth++;
+    else if (ch === "}") depth = Math.max(0, depth - 1);
+    cur += ch;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+/** Numbers (possibly parenthesised or with trailing punctuation) join an adjacent math run. */
+function isWeakToken(tok: string): boolean {
+  return /^[([{]*\d+(\.\d+)?[)\]}]*[.,;:]?$/.test(tok);
+}
+
 function isMathToken(tok: string): boolean {
   const core = tok.replace(/^[(\[{]+|[)\]},.;:!?]+$/g, "");
   if (!core) return false;
-  if (STRONG.test(tok)) return true;
+  if (STRONG.test(tok) || tok.includes("\\")) return true;
   if (/^[+\-*/]$/.test(core)) return true;
   if (/^[A-Za-z]$/.test(core)) return !/^(a|A|I)$/.test(core);
   if (/^\d+$/.test(core)) return false;
@@ -171,22 +204,35 @@ export function assistedLatex(text: string): string {
         run = [];
         runStrong = false;
       };
-      for (const t of line.split(/(\s+)/)) {
+      // Numbers directly before or after a math run belong to it ("x_1 = 1", "(1 + …").
+      let pending: string[] = [];
+      for (const t of splitTokens(line)) {
         if (t === "") continue;
         if (/^\s+$/.test(t)) {
           if (run.length) run.push(t);
+          else if (pending.length) pending.push(t);
           else out.push(t);
           continue;
         }
         if (isMathToken(t)) {
+          if (!run.length && pending.length) {
+            run.push(...pending);
+            pending = [];
+          }
           run.push(t);
           if (STRONG.test(t) || /^[+\-*/]$/.test(t)) runStrong = true;
+        } else if (isWeakToken(t)) {
+          if (run.length) run.push(t);
+          else pending.push(t);
         } else {
           flush();
+          out.push(...pending);
+          pending = [];
           out.push(t);
         }
       }
       flush();
+      out.push(...pending);
       return out.join("");
     })
     .join("\n");

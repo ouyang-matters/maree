@@ -228,6 +228,7 @@ export function planDocument(
         title: sp.title ?? "",
         statement: sp.statement,
         wholeStatement: wholeText(sp.statement, parts),
+        plain: { statement: sp.statement, parts },
         rawText: wholeText(sp.statement, parts),
         assistedStatement: null,
         assistedParts: null,
@@ -259,6 +260,7 @@ export function planDocument(
       title: doc.title,
       statement: "",
       wholeStatement: "",
+      plain: { statement: "", parts: [] },
       rawText: "",
       assistedStatement: null,
       assistedParts: null,
@@ -306,6 +308,7 @@ export function planDocument(
         title: sp.title,
         statement,
         wholeStatement: whole,
+        plain: { statement, parts },
         rawText: linesToText(sp.raw),
         assistedStatement,
         assistedParts,
@@ -338,6 +341,7 @@ export function planDocument(
           title: `Page ${page}`,
           statement: "",
           wholeStatement: "",
+          plain: { statement: "", parts: [] },
           rawText: "",
           assistedStatement: null,
           assistedParts: null,
@@ -442,11 +446,17 @@ export function mapLectures(plan: DocPlan, courseId: string | null, ctx: Pick<Li
   return { ...plan, courseId, lectureMap, candidates };
 }
 
+/** Rebuilds the working copy from the preserved variants (plain or assisted, split or inline). */
+export function withVariant(c: Candidate, assisted: boolean, split: boolean): Candidate {
+  const useAssisted = assisted && c.assistedStatement !== null;
+  const statement = useAssisted ? c.assistedStatement! : c.plain.statement;
+  const parts = useAssisted && c.assistedParts ? c.assistedParts : c.plain.parts;
+  if (split && parts.length) return { ...c, usingAssisted: useAssisted, splitParts: true, statement, parts: parts.map((p) => ({ ...p })) };
+  return { ...c, usingAssisted: useAssisted, splitParts: false, statement: wholeText(statement, parts), parts: [] };
+}
+
 export function candidateText(c: Candidate): { statement: string; parts: CandidatePart[] } {
-  const statement = c.usingAssisted && c.assistedStatement !== null ? c.assistedStatement : c.statement;
-  const parts = c.usingAssisted && c.assistedParts ? c.assistedParts : c.parts;
-  if (!c.splitParts) return { statement: c.usingAssisted && c.assistedStatement !== null ? wholeText(statement, parts) : c.wholeStatement, parts: [] };
-  return { statement, parts };
+  return { statement: c.statement, parts: c.splitParts ? c.parts : [] };
 }
 
 /** Flags kept on the stored problem so it shows up under "Needs import review". */
