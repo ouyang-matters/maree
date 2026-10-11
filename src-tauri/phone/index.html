@@ -56,6 +56,8 @@
   .bar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .2s; }
   .empty { color: var(--text-3); font-size: 14px; padding: 4px 2px; }
   .pair { background: var(--elev); border: 1px solid var(--border); border-radius: 12px; padding: 18px; color: var(--text-2); }
+  .applink { margin-top: 28px; font-size: 14px; color: var(--text-3); text-align: center; }
+  .applink a { color: var(--accent); font-weight: 600; text-decoration: none; }
   .hidden { display: none !important; }
 </style>
 </head>
@@ -93,6 +95,7 @@
   <h2 id="sentTitle"></h2>
   <ul id="list"></ul>
   <p id="empty" class="empty"></p>
+  <p id="getApp" class="applink hidden"><a id="getAppLink" href="#"></a><br><span id="getAppHint"></span></p>
 </main>
 
 <script>
@@ -106,7 +109,10 @@ const STRINGS = {
     waiting: "Waiting", sending: "Sending", done: "In the inbox", failed: "Not sent — will retry", retry: "Retry",
     pair: "Open Marée on your computer, choose Tools → Connect Phone, and scan the QR code with this phone's camera.",
     expired: "This phone is no longer paired. Scan the QR code in Marée again (Tools → Connect Phone).",
-    toobig: "Photo too large", unsupported: "Unsupported image"
+    toobig: "Photo too large", unsupported: "Unsupported image",
+    getApp: "Use the Android app",
+    getAppHint: "Opens the Marée app with this pairing. The first time it downloads the app from your computer: install it, then come back and tap again.",
+    pairApp: "To pair: open Marée on your computer (Tools → Connect Phone), scan the QR code with this phone's camera, and on the page that opens tap “Use the Android app”."
   },
   "zh-Hant": {
     question: "題目", answer: "我的解答", shoot: "拍照", pick: "從相簿選擇",
@@ -116,7 +122,10 @@ const STRINGS = {
     waiting: "等待中", sending: "傳送中", done: "已在收件匣", failed: "未傳送——稍後會重試", retry: "重試",
     pair: "在電腦上打開 Marée，選擇「工具 → 連接手機」，再用這支手機的相機掃描 QR 碼。",
     expired: "這支手機已不再配對。請在 Marée 中重新掃描 QR 碼（工具 → 連接手機）。",
-    toobig: "照片太大", unsupported: "不支援的圖片格式"
+    toobig: "照片太大", unsupported: "不支援的圖片格式",
+    getApp: "使用 Android App",
+    getAppHint: "會用目前的配對打開 Marée App。第一次會從你的電腦下載 App：安裝後回到這裡再點一次。",
+    pairApp: "配對方法：在電腦上打開 Marée（工具 → 連接手機），用這支手機的相機掃描 QR 碼，在打開的網頁上點「使用 Android App」。"
   },
   "zh-Hans": {
     question: "题目", answer: "我的解答", shoot: "拍照", pick: "从相册选择",
@@ -126,7 +135,10 @@ const STRINGS = {
     waiting: "等待中", sending: "发送中", done: "已在收件箱", failed: "未发送——稍后会重试", retry: "重试",
     pair: "在电脑上打开 Marée，选择“工具 → 连接手机”，再用这部手机的相机扫描二维码。",
     expired: "这部手机已不再配对。请在 Marée 中重新扫描二维码（工具 → 连接手机）。",
-    toobig: "照片太大", unsupported: "不支持的图片格式"
+    toobig: "照片太大", unsupported: "不支持的图片格式",
+    getApp: "使用 Android 应用",
+    getAppHint: "会用当前的配对打开 Marée 应用。第一次会从你的电脑下载应用：安装后回到这里再点一次。",
+    pairApp: "配对方法：在电脑上打开 Marée（工具 → 连接手机），用这部手机的相机扫描二维码，在打开的网页上点“使用 Android 应用”。"
   }
 };
 function pickLang(desktop) {
@@ -141,6 +153,10 @@ let lang = pickLang("");
 const T = (k) => (STRINGS[lang] || STRINGS.en)[k] || STRINGS.en[k];
 const $ = (id) => document.getElementById(id);
 
+// Inside the Android app the page is bundled and the app does the networking (it finds
+// the computer by itself and keeps the pairing key); in a browser the computer serves it.
+const NATIVE = window.MareeAndroid || null;
+
 // Pairing key: from the QR link, remembered for the home-screen shortcut.
 const params = new URLSearchParams(location.search);
 let key = params.get("k") || "";
@@ -148,10 +164,49 @@ try {
   if (key) localStorage.setItem("maree-key", key);
   else key = localStorage.getItem("maree-key") || "";
 } catch (e) { /* private mode */ }
+if (NATIVE) key = NATIVE.paired() ? "app" : "";
 
 let mode = "question";
 let info = { problems: [] };
 let online = null;
+let hostLabel = NATIVE ? NATIVE.host() : "";
+
+let callSeq = 0;
+const calls = new Map();
+window.__mareeReply = (id, status, body) => {
+  const c = calls.get(id);
+  if (c) { calls.delete(id); c.resolve({ status, body }); }
+};
+window.__mareeProgress = (id, f) => {
+  const c = calls.get(id);
+  if (c && c.progress) c.progress(f);
+};
+window.__mareeHost = (h) => { hostLabel = h; renderConn(); };
+function nativeCall(method, args, progress) {
+  return new Promise((resolve) => {
+    const id = ++callSeq;
+    calls.set(id, { resolve, progress });
+    NATIVE[method](id, ...args);
+  });
+}
+/** GET /api/info → {status, body}; status 0 means the computer could not be reached. */
+async function getInfo() {
+  if (NATIVE) return nativeCall("info", []);
+  try {
+    const r = await fetch("/api/info", { headers: { "x-maree-key": key }, cache: "no-store" });
+    return { status: r.status, body: await r.text() };
+  } catch (e) {
+    return { status: 0, body: "" };
+  }
+}
+function blobBase64(blob) {
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => res(String(fr.result).replace(/^data:[^,]*,/, ""));
+    fr.onerror = () => rej(fr.error);
+    fr.readAsDataURL(blob);
+  });
+}
 const entries = []; // {id, kind, problem, label, thumb, state, progress, blob}
 
 // ---------------------------------------------------------------- queue storage
@@ -191,6 +246,8 @@ function applyText() {
   $("targetLabel").textContent = T("target");
   $("sentTitle").textContent = T("sent");
   $("empty").textContent = T("none");
+  $("getAppLink").textContent = T("getApp");
+  $("getAppHint").textContent = T("getAppHint");
   renderConn();
   renderTargets();
   renderList();
@@ -198,7 +255,17 @@ function applyText() {
 function renderConn() {
   const c = $("conn");
   c.className = "conn" + (online === true ? " on" : online === false ? " off" : "");
-  $("connText").textContent = online === true ? (info.desktop ? T("connected") + " · " + info.desktop : T("connected")) : online === false ? T("offline") : T("checking");
+  const where = NATIVE && hostLabel ? " · " + hostLabel.replace(/:\d+$/, "") : "";
+  $("connText").textContent = online === true ? T("connected") + where : online === false ? T("offline") : T("checking");
+  // In a phone browser on Android, offer the app (opened with this pairing, or downloaded).
+  const app = $("getApp");
+  const show = !NATIVE && key && online === true && /Android/i.test(navigator.userAgent);
+  app.classList.toggle("hidden", !show);
+  if (show) {
+    const fallback = encodeURIComponent(location.origin + "/maree.apk");
+    $("getAppLink").href = "intent://pair?h=" + encodeURIComponent(location.host) + "&k=" + encodeURIComponent(key) +
+      "#Intent;scheme=maree;package=com.maree.phone;S.browser_fallback_url=" + fallback + ";end";
+  }
 }
 function renderTargets() {
   const sel = $("target");
@@ -285,11 +352,12 @@ function showPairing(text) {
 
 // ---------------------------------------------------------------- network
 async function refreshInfo() {
-  if (!key) { showPairing(T("pair")); return; }
+  if (!key) { showPairing(T(NATIVE ? "pairApp" : "pair")); return; }
   try {
-    const r = await fetch("/api/info", { headers: { "x-maree-key": key }, cache: "no-store" });
-    if (r.status === 401) { online = true; showPairing(T("expired")); renderConn(); return; }
-    info = await r.json();
+    const r = await getInfo();
+    if (r.status === 0) throw new Error("net");
+    if (r.status === 401) { online = true; showPairing(T(NATIVE ? "pairApp" : "expired")); renderConn(); return; }
+    info = JSON.parse(r.body);
     online = true;
     const next = pickLang(info.locale);
     if (next !== lang) { lang = next; applyText(); }
@@ -300,7 +368,13 @@ async function refreshInfo() {
   renderConn();
 }
 
-function upload(e) {
+async function upload(e) {
+  if (NATIVE) {
+    const b64 = await blobBase64(e.blob);
+    const r = await nativeCall("upload", [e.kind, e.problem || "", e.name || "photo.jpg", b64], (f) => { e.progress = f; renderList(); });
+    if (r.status === 200) return;
+    throw new Error(r.status === 413 ? "toobig" : r.status === 415 ? "unsupported" : r.status === 401 ? "auth" : "net");
+  }
   return new Promise((resolve, reject) => {
     const x = new XMLHttpRequest();
     x.open("POST", "/api/upload");
@@ -343,7 +417,7 @@ async function pump() {
         e.state = "failed";
         const m = String(err && err.message);
         if (m === "toobig" || m === "unsupported") { e.error = m; await store("del", e.id); }
-        if (m === "auth") showPairing(T("expired"));
+        if (m === "auth") showPairing(T(NATIVE ? "pairApp" : "expired"));
         if (m === "net") { online = false; renderConn(); renderList(); break; }
       }
       renderList();

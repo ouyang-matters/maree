@@ -8,3 +8,4 @@ src-tauri/gen/
 e2e-data/
 test-results/
 public/pdfjs/
+android/build/

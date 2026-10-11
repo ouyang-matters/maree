@@ -7,12 +7,18 @@ use serde::Serialize;
 use std::io::Read;
 use std::net::{IpAddr, Ipv4Addr, UdpSocket};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 use tiny_http::{Header, Method, Request, Response, Server};
 
 const PAGE: &str = include_str!("../phone/index.html");
 const ICON: &[u8] = include_bytes!("../icons/128x128@2x.png");
+/// The Android app (built by `npm run build:apk`), offered for download on the phone page.
+const APK: &[u8] = include_bytes!("../phone/maree-phone.apk");
+/// UDP port on which the Android app looks for this computer.
+pub const DISCOVERY_PORT: u16 = 47148;
 
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -24,6 +30,7 @@ pub struct LinkStatus {
 
 struct Running {
     server: Arc<Server>,
+    alive: Arc<AtomicBool>,
     token: String,
     status: LinkStatus,
 }
@@ -136,6 +143,11 @@ fn handle(mut req: Request, token: &str, inbox_dir: &PathBuf, context: &Arc<Mute
             });
             security_headers(Response::from_string(m.to_string()).with_header(content_type("application/manifest+json")))
         }
+        (Method::Get, "/maree.apk") => security_headers(
+            Response::from_data(APK.to_vec())
+                .with_header(content_type("application/vnd.android.package-archive"))
+                .with_header(Header::from_bytes(&b"Content-Disposition"[..], &b"attachment; filename=\"maree-phone.apk\""[..]).expect("valid header")),
+        ),
         (Method::Get, "/icon.png") | (Method::Get, "/apple-touch-icon.png") => {
             security_headers(Response::from_data(ICON.to_vec()).with_header(content_type("image/png")))
         }
@@ -202,6 +214,7 @@ impl PhoneLink {
         }
         if let Some(r) = guard.take() {
             r.server.unblock();
+            r.alive.store(false, Ordering::SeqCst);
         }
         // Automated tests stay on the loopback interface (no firewall prompt, nothing exposed).
         let host = if loopback_only() { "127.0.0.1" } else { "0.0.0.0" };
@@ -215,7 +228,9 @@ impl PhoneLink {
                 std::thread::spawn(move || handle(req, &tok, &dir, &ctx, &app));
             }
         });
-        *guard = Some(Running { server, token, status: status.clone() });
+        let alive = Arc::new(AtomicBool::new(true));
+        spawn_discovery(host, discovery_tag(&token), port, alive.clone());
+        *guard = Some(Running { server, alive, token, status: status.clone() });
         Ok(status)
     }
 
@@ -223,9 +238,41 @@ impl PhoneLink {
         if let Ok(mut g) = self.running.lock() {
             if let Some(r) = g.take() {
                 r.server.unblock();
+                r.alive.store(false, Ordering::SeqCst);
             }
         }
     }
+}
+
+/// What the app sends to find its computer: a hash of the pairing key, never the key.
+pub fn discovery_tag(token: &str) -> String {
+    crate::files::sha256_hex(token.as_bytes())[..12].to_string()
+}
+
+/// Answers "MAREE-DISCOVER <tag>" broadcasts from a paired phone with "MAREE <port>".
+fn spawn_discovery(host: &str, tag: String, port: u16, alive: Arc<AtomicBool>) {
+    let sock = match UdpSocket::bind((host, DISCOVERY_PORT)) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("phone discovery unavailable: {e}");
+            return;
+        }
+    };
+    let _ = sock.set_read_timeout(Some(Duration::from_millis(500)));
+    std::thread::spawn(move || {
+        let mut buf = [0u8; 128];
+        while alive.load(Ordering::SeqCst) {
+            if let Ok((n, from)) = sock.recv_from(&mut buf) {
+                if discovery_reply(&buf[..n], &tag) {
+                    let _ = sock.send_to(format!("MAREE {port}").as_bytes(), from);
+                }
+            }
+        }
+    });
+}
+
+fn discovery_reply(msg: &[u8], tag: &str) -> bool {
+    std::str::from_utf8(msg).map(|m| m.trim() == format!("MAREE-DISCOVER {tag}")).unwrap_or(false)
 }
 
 fn loopback_only() -> bool {
@@ -250,6 +297,15 @@ mod tests {
         assert!(is_private(&Ipv4Addr::new(172, 20, 1, 1)));
         assert!(!is_private(&Ipv4Addr::new(8, 8, 8, 8)));
         assert!(!is_private(&Ipv4Addr::new(172, 32, 0, 1)));
+    }
+
+    #[test]
+    fn discovery_only_answers_the_paired_phone() {
+        let tag = discovery_tag("abcdef0123456789abcdef");
+        assert_eq!(tag.len(), 12);
+        assert!(discovery_reply(format!("MAREE-DISCOVER {tag}\n").as_bytes(), &tag));
+        assert!(!discovery_reply(b"MAREE-DISCOVER 000000000000", &tag));
+        assert!(!discovery_reply(b"hello", &tag));
     }
 
     #[test]

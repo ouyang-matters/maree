@@ -99,7 +99,7 @@ export function PhoneDialog() {
                 <ol className="phone-steps">
                   <li>{t("Connect the phone to the same Wi-Fi as this computer.")}</li>
                   <li>{t("Scan the code with the phone's camera and open the link.")}</li>
-                  <li>{t("Add the page to the home screen (iPhone: Share → Add to Home Screen; Android: ⋮ → Add to Home screen) for one-tap access.")}</li>
+                  <li>{t("Android: tap “Use the Android app” on that page to install the Marée app; it finds this computer by itself from then on. iPhone: Share → Add to Home Screen.")}</li>
                 </ol>
                 <div className="phone-url selectable" title={url}>
                   {url.replace(/\?k=.*/, "")}

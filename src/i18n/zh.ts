@@ -55,7 +55,7 @@ export const zh: Record<string, string> = {
   "Port": "端口",
   "Connect the phone to the same Wi-Fi as this computer.": "让手机连接与这台电脑相同的 Wi-Fi。",
   "Scan the code with the phone's camera and open the link.": "用手机相机扫描二维码并打开链接。",
-  "Add the page to the home screen (iPhone: Share → Add to Home Screen; Android: ⋮ → Add to Home screen) for one-tap access.": "把页面添加到主屏幕（iPhone：分享 → 添加到主屏幕；Android：⋮ → 添加到主屏幕），之后一键打开。",
+  "Android: tap “Use the Android app” on that page to install the Marée app; it finds this computer by itself from then on. iPhone: Share → Add to Home Screen.": "Android：在那个页面上点“使用 Android 应用”安装 Marée 应用，之后它会自动找到这台电脑。iPhone：分享 → 添加到主屏幕。",
   "Phone cannot connect? Try another address ({i}/{n})": "手机连不上？换一个地址试试（{i}/{n}）",
   "If Windows asks whether Marée may use private networks, allow it. Campus and public Wi-Fi often block devices from reaching each other; use a folder there instead.": "如果 Windows 询问是否允许 Marée 使用专用网络，请允许。校园网和公共 Wi-Fi 常常禁止设备互连，这时请改用文件夹同步。",
   "This computer has no local network address. Connect it to Wi-Fi or Ethernet.": "这台电脑没有局域网地址。请连接 Wi-Fi 或以太网。",

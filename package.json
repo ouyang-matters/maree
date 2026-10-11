@@ -21,6 +21,7 @@
     "tauri:build": "tauri build",
     "e2e": "node scripts/e2e-acceptance.mjs",
     "e2e:phone": "node scripts/e2e-phone.mjs",
+    "build:apk": "node scripts/build-apk.mjs",
     "fixtures": "node scripts/build-fixtures.mjs"
   },
   "dependencies": {

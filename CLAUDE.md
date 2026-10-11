@@ -20,6 +20,8 @@ npm run typecheck      # tsc --noEmit
 npm run tauri:build    # release exe + NSIS and MSI installers in src-tauri/target/release/bundle
 npm run e2e            # acceptance test against the built exe (see scripts/e2e-acceptance.mjs)
 npm run e2e:phone      # phone link → photo inbox → crop → Copy for ChatGPT (overwrites the clipboard)
+npm run build:apk      # Android app → src-tauri/phone/maree-phone.apk (embedded in the exe; run before tauri build)
+node scripts/build-apk.mjs --debug && node scripts/e2e-android.mjs   # on a running emulator
 node scripts/ui-shots.mjs <outDir> tour|acceptance [theme]   # headless Edge screenshots of the dev server
 ```
 
@@ -35,7 +37,12 @@ src-tauri/src/
   phone.rs      phone link: tiny_http server on the LAN, pairing key, serves phone/index.html
   inbox.rs      photo inbox (files/inbox: image + JSON sidecar), archive, watched-folder collection
   clip.rs       clipboard with several images (CF_HDROP + PNG + bitmap) for "Copy for ChatGPT"
-src-tauri/phone/index.html   the phone page (plain HTML/JS, no build step, upload queue in IndexedDB)
+src-tauri/phone/index.html   the phone page (plain HTML/JS, no build step, upload queue in IndexedDB);
+                             also bundled into the Android app, where it talks to window.MareeAndroid
+android/      Android app (plain Java, no Gradle/AndroidX): WebView on the bundled page, native
+              HTTP + UDP discovery (port 47148, hash of the pairing key), camera via PhotoProvider.
+              Built with aapt2/javac/d8/apksigner by scripts/build-apk.mjs; the signing key lives
+              in ~/.maree-android (keep it, or updates cannot be installed over the old app).
 src/
   data/         driver.ts (SqlDriver), schema.ts (migrations), repo.ts (ALL SQL), types.ts, sample.ts
   domain/       pure logic: filters & sorting, statuses, review queue, progress, photos (crop regions, BMP)
