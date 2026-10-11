@@ -104,4 +104,9 @@ const apk = debug ? path.join(root, "e2e-data", "maree-phone-debug.apk") : path.
 run(exe("apksigner"), ["sign", "--ks", keystore, "--ks-key-alias", "maree", "--ks-pass", `pass:${pass}`, "--key-pass", `pass:${pass}`, "--out", apk, aligned]);
 run(exe("apksigner"), ["verify", apk]);
 fs.rmSync(apk + ".idsig", { force: true });
+if (!debug) {
+  // Read by scripts/release.mjs to publish android.json for the app's update check.
+  const sha256 = crypto.createHash("sha256").update(fs.readFileSync(apk)).digest("hex");
+  fs.writeFileSync(apk.replace(/\.apk$/, ".json"), JSON.stringify({ versionCode: Number(versionCode), versionName, sha256 }, null, 2) + "\n");
+}
 console.log(`\n${apk} (${(fs.statSync(apk).size / 1024).toFixed(0)} KB, version ${versionName} / ${versionCode}, ${platform})`);

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { checkForUpdates } from "../state/updates";
 import { FolderOpen } from "lucide-react";
 import { useStore } from "../state/store";
 import * as A from "../state/actions";
@@ -95,6 +96,17 @@ export function SettingsView() {
             <input type="checkbox" checked={settings.spellcheck} onChange={(e) => A.updateSettings({ spellcheck: e.target.checked })} />
             {t("Enabled")}
           </label>
+        </Row>
+
+        <h2 className="set-section">{t("Updates")}</h2>
+        <Row label={t("Version {v}", { v: info?.version ?? "" })} hint={t("New versions come from GitHub Releases and are installed only if they carry Marée's signature.")}>
+          <label className="checkbox">
+            <input type="checkbox" checked={settings.autoUpdate} onChange={(e) => A.updateSettings({ autoUpdate: e.target.checked })} />
+            {t("Check automatically")}
+          </label>
+          <button className="btn btn-sm" onClick={() => void checkForUpdates(true)}>
+            {t("Check Now")}
+          </button>
         </Row>
 
         <h2 className="set-section">{t("LaTeX macros")}</h2>

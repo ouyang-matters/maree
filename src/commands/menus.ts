@@ -101,7 +101,7 @@ export function menuBar(): MenuDef[] {
     },
     {
       label: t("Help"),
-      items: ["help.welcome", "help.shortcuts", "-", "help.about"],
+      items: ["help.welcome", "help.shortcuts", "-", "help.updates", "help.about"],
     },
   ];
 }

@@ -7,7 +7,9 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.provider.MediaStore;
 import android.util.Base64;
 import android.webkit.JavascriptInterface;
@@ -50,6 +52,8 @@ import java.util.regex.Pattern;
  */
 public class MainActivity extends Activity {
     static final String ORIGIN = "http://app.maree/";
+    /** Published by scripts/release.mjs with every GitHub release. */
+    static final String UPDATE_URL = "https://github.com/ouyang-matters/maree/releases/latest/download/android.json";
     static final int DISCOVERY_PORT = 47148;
     static final int REQUEST_FILES = 1;
     static final Pattern KEY = Pattern.compile("[0-9a-f]{16,128}");
@@ -59,6 +63,7 @@ public class MainActivity extends Activity {
     SharedPreferences prefs;
     ValueCallback<Uri[]> pendingFiles;
     Uri cameraUri;
+    JSONObject available;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -372,7 +377,120 @@ public class MainActivity extends Activity {
         });
     }
 
+    // ------------------------------------------------------------------ updates
+
+    long ownVersion() {
+        try {
+            return getPackageManager().getPackageInfo(getPackageName(), 0).versionCode;
+        } catch (Exception e) {
+            return Long.MAX_VALUE;
+        }
+    }
+
+    static byte[] readAll(InputStream in) throws IOException {
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+        byte[] b = new byte[8192];
+        int n;
+        while ((n = in.read(b)) > 0) buf.write(b, 0, n);
+        in.close();
+        return buf.toByteArray();
+    }
+
+    /** {"available":true,"versionName":"1.2.0"} when GitHub has a newer build. */
+    String checkUpdate() throws Exception {
+        HttpURLConnection c = (HttpURLConnection) new URL(UPDATE_URL).openConnection();
+        c.setConnectTimeout(8000);
+        c.setReadTimeout(8000);
+        if (c.getResponseCode() != 200) return "{\"available\":false}";
+        JSONObject j = new JSONObject(new String(readAll(c.getInputStream()), StandardCharsets.UTF_8));
+        boolean newer = j.getLong("versionCode") > ownVersion() && j.getString("url").startsWith("https://github.com/");
+        available = newer ? j : null;
+        return new JSONObject().put("available", newer).put("versionName", j.optString("versionName")).toString();
+    }
+
+    /** Downloads, checks the SHA-256 and opens Android's installer (which checks the signature). */
+    int installUpdate(int id) throws Exception {
+        if (available == null) return 404;
+        HttpURLConnection c = (HttpURLConnection) new URL(available.getString("url")).openConnection();
+        c.setConnectTimeout(10000);
+        c.setReadTimeout(60000);
+        if (c.getResponseCode() != 200) return c.getResponseCode();
+        int total = c.getContentLength();
+        File dir = new File(getCacheDir(), "updates");
+        dir.mkdirs();
+        File apk = new File(dir, PhotoProvider.UPDATE);
+        MessageDigest sha = MessageDigest.getInstance("SHA-256");
+        try (InputStream in = c.getInputStream(); OutputStream out = new java.io.FileOutputStream(apk)) {
+            byte[] b = new byte[64 * 1024];
+            long got = 0;
+            double last = 0;
+            int n;
+            while ((n = in.read(b)) > 0) {
+                out.write(b, 0, n);
+                sha.update(b, 0, n);
+                got += n;
+                if (total > 0 && got / (double) total - last >= 0.1) {
+                    last = got / (double) total;
+                    progress(id, last);
+                }
+            }
+        }
+        StringBuilder hex = new StringBuilder();
+        for (byte x : sha.digest()) hex.append(String.format("%02x", x));
+        if (!hex.toString().equalsIgnoreCase(available.getString("sha256"))) {
+            apk.delete();
+            return 422;
+        }
+        if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+            onUi(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName())));
+            return 403;
+        }
+        Intent install = new Intent(Intent.ACTION_VIEW);
+        install.setDataAndType(Uri.parse("content://com.maree.phone.photos/" + PhotoProvider.UPDATE), "application/vnd.android.package-archive");
+        install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+        onUi(install);
+        return 200;
+    }
+
+    void onUi(final Intent intent) {
+        runOnUiThread(new Runnable() {
+            public void run() {
+                try {
+                    startActivity(intent);
+                } catch (ActivityNotFoundException e) {
+                    // nothing can handle it
+                }
+            }
+        });
+    }
+
     class Bridge {
+        @JavascriptInterface
+        public void checkUpdate(final int id) {
+            new Thread(new Runnable() {
+                public void run() {
+                    try {
+                        reply(id, 200, MainActivity.this.checkUpdate());
+                    } catch (Exception e) {
+                        reply(id, 0, "");
+                    }
+                }
+            }).start();
+        }
+
+        @JavascriptInterface
+        public void installUpdate(final int id) {
+            new Thread(new Runnable() {
+                public void run() {
+                    try {
+                        reply(id, MainActivity.this.installUpdate(id), "");
+                    } catch (Exception e) {
+                        reply(id, 0, "");
+                    }
+                }
+            }).start();
+        }
+
         @JavascriptInterface
         public boolean paired() {
             return prefs.getString("key", null) != null;

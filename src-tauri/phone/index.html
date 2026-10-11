@@ -56,6 +56,11 @@
   .bar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .2s; }
   .empty { color: var(--text-3); font-size: 14px; padding: 4px 2px; }
   .pair { background: var(--elev); border: 1px solid var(--border); border-radius: 12px; padding: 18px; color: var(--text-2); }
+  .update { display: flex; align-items: center; gap: 10px; margin: -6px 0 16px; padding: 10px 12px; border-radius: 10px;
+    background: var(--accent-soft); color: var(--text); font-size: 14px; }
+  .update span { flex: 1; }
+  .update button { font: inherit; font-size: 14px; font-weight: 600; border: 0; border-radius: 8px; padding: 7px 12px; background: var(--accent); color: #fff; }
+  .update button:disabled { opacity: .6; }
   .applink { margin-top: 28px; font-size: 14px; color: var(--text-3); text-align: center; }
   .applink a { color: var(--accent); font-weight: 600; text-decoration: none; }
   .hidden { display: none !important; }
@@ -67,6 +72,7 @@
   <div id="conn" class="conn"><span class="dot"></span><span id="connText"></span></div>
 </header>
 
+<div id="update" class="update hidden"><span id="updateText"></span><button id="updateBtn"></button></div>
 <div id="pair" class="pair hidden"></div>
 
 <main id="main">
@@ -112,6 +118,9 @@ const STRINGS = {
     toobig: "Photo too large", unsupported: "Unsupported image",
     getApp: "Use the Android app",
     getAppHint: "Opens the Marée app with this pairing. The first time it downloads the app from your computer: install it, then come back and tap again.",
+    updateAvailable: "Marée {v} is available.", updateNow: "Update", updating: "Downloading…",
+    allowInstall: "Allow Marée to install updates in the screen that opened, then tap Update again.",
+    updateFailed: "The update could not be downloaded.",
     pairApp: "To pair: open Marée on your computer (Tools → Connect Phone), scan the QR code with this phone's camera, and on the page that opens tap “Use the Android app”."
   },
   "zh-Hant": {
@@ -125,6 +134,9 @@ const STRINGS = {
     toobig: "照片太大", unsupported: "不支援的圖片格式",
     getApp: "使用 Android App",
     getAppHint: "會用目前的配對打開 Marée App。第一次會從你的電腦下載 App：安裝後回到這裡再點一次。",
+    updateAvailable: "Marée {v} 可以更新。", updateNow: "更新", updating: "下載中…",
+    allowInstall: "請在剛打開的畫面中允許 Marée 安裝更新，然後再點一次「更新」。",
+    updateFailed: "無法下載更新。",
     pairApp: "配對方法：在電腦上打開 Marée（工具 → 連接手機），用這支手機的相機掃描 QR 碼，在打開的網頁上點「使用 Android App」。"
   },
   "zh-Hans": {
@@ -138,6 +150,9 @@ const STRINGS = {
     toobig: "照片太大", unsupported: "不支持的图片格式",
     getApp: "使用 Android 应用",
     getAppHint: "会用当前的配对打开 Marée 应用。第一次会从你的电脑下载应用：安装后回到这里再点一次。",
+    updateAvailable: "Marée {v} 可以更新。", updateNow: "更新", updating: "下载中…",
+    allowInstall: "请在刚打开的页面中允许 Marée 安装更新，然后再点一次“更新”。",
+    updateFailed: "无法下载更新。",
     pairApp: "配对方法：在电脑上打开 Marée（工具 → 连接手机），用这部手机的相机扫描二维码，在打开的网页上点“使用 Android 应用”。"
   }
 };
@@ -499,6 +514,35 @@ document.addEventListener("visibilitychange", () => {
 });
 window.addEventListener("online", () => pump());
 
+// ---------------------------------------------------------------- app updates (Android app only)
+let updateVersion = "";
+async function checkUpdate() {
+  if (!NATIVE || !NATIVE.checkUpdate) return;
+  try {
+    const last = Number(localStorage.getItem("maree-update-check") || 0);
+    if (Date.now() - last < 6 * 3600 * 1000 && !updateVersion) return;
+    localStorage.setItem("maree-update-check", String(Date.now()));
+  } catch (e) { /* storage unavailable: check anyway */ }
+  const r = await nativeCall("checkUpdate", []);
+  if (r.status !== 200) return;
+  const u = JSON.parse(r.body);
+  if (!u.available) return;
+  updateVersion = u.versionName;
+  $("updateText").textContent = T("updateAvailable").replace("{v}", updateVersion);
+  $("updateBtn").textContent = T("updateNow");
+  $("update").classList.remove("hidden");
+}
+$("updateBtn").onclick = async () => {
+  const b = $("updateBtn");
+  b.disabled = true;
+  b.textContent = T("updating");
+  const r = await nativeCall("installUpdate", [], (f) => { b.textContent = T("updating") + " " + Math.round(f * 100) + "%"; });
+  b.disabled = false;
+  b.textContent = T("updateNow");
+  if (r.status === 403) $("updateText").textContent = T("allowInstall");
+  else if (r.status !== 200) $("updateText").textContent = T("updateFailed");
+};
+
 (async function init() {
   applyText();
   for (const q of (await store("all")) || []) {
@@ -508,6 +552,7 @@ window.addEventListener("online", () => pump());
   renderList();
   await refreshInfo();
   pump();
+  checkUpdate();
   setInterval(refreshInfo, 30000);
 })();
 </script>

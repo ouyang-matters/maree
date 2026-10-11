@@ -48,13 +48,24 @@ its provenance, and your proofs, attempts and notes stay on your own computer.
 
 ## Install (Windows 10/11)
 
-The installers are in the `release/` folder (a fresh build writes them to
-`src-tauri/target/release/bundle/`):
+Download from [Releases](https://github.com/ouyang-matters/maree/releases/latest):
 
-* `Marée_1.0.0_x64-setup.exe` — per-user installer, no administrator rights needed
-  (recommended; tested: install, full acceptance run, clean uninstall)
-* `Marée_1.0.0_x64_en-US.msi` — MSI package for managed, per-machine installs (built, not install-tested)
-* `maree-portable.exe` — the bare executable, for portable use (see below)
+* `Maree_<version>_x64-setup.exe` — per-user installer, no administrator rights needed (recommended)
+* `Maree_<version>_x64_en-US.msi` — MSI package for managed, per-machine installs
+* `maree-phone.apk` — the Android companion app (see *Phone* below)
+
+Once installed, Marée checks GitHub Releases for new versions and installs them on request;
+only updates signed with Marée's update key are accepted (Settings › Updates).
+
+## Phone
+
+Tools › Connect Phone shows a QR code. Scan it with the phone (same Wi-Fi as the computer)
+to open the phone page: take photos of problems and of your written answers, and they arrive
+in Marée's Photo Inbox, where you crop them into problems and attach answers. On Android,
+"Use the Android app" on that page installs the companion app, which finds the computer by
+itself and queues photos while offline. Away from that Wi-Fi, a synced folder (for example
+Google Drive) can be watched instead. In a problem, Ctrl+Shift+C copies the problem and your
+answer as images, ready to paste into ChatGPT.
 
 Marée uses Microsoft Edge WebView2, which is part of Windows 11 and current Windows 10;
 the installer downloads it if missing. The installers are not code-signed, so Windows

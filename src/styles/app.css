@@ -1788,3 +1788,7 @@ button.diff:hover {
   font-size: 12px;
   color: var(--danger);
 }
+
+.statusbar .sb-update {
+  color: var(--accent);
+}

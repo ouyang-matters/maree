@@ -39,6 +39,7 @@ import {
   Smartphone,
 } from "lucide-react";
 import { addPhotos, copyForChatGpt, openInbox } from "../state/inbox";
+import { checkForUpdates } from "../state/updates";
 import { get, activeProblemId, set } from "../state/store";
 import * as A from "../state/actions";
 import { STATUSES, type Status } from "../data/types";
@@ -251,6 +252,7 @@ export function buildCommands(): Command[] {
     // Help
     { id: "help.welcome", label: t("Getting Started"), category: t("Help"), run: () => A.openTab({ id: "welcome", kind: "welcome" }) },
     { id: "help.shortcuts", label: t("Keyboard Shortcuts and LaTeX Syntax"), category: t("Help"), shortcut: "F1", icon: <Keyboard size={15} />, run: () => A.openTab({ id: "help", kind: "help" }), global: true },
+    { id: "help.updates", label: t("Check for Updates…"), category: t("Help"), icon: <RefreshCw size={15} />, run: () => checkForUpdates(true) },
     { id: "help.about", label: t("About Marée"), category: t("Help"), run: () => A.openDialog({ kind: "about" }) },
   ];
 }

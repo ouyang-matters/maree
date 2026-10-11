@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { addPhotos, initInbox } from "./state/inbox";
+import { initUpdates } from "./state/updates";
 import { inboxInFront } from "./components/InboxView";
 import { useStore } from "./state/store";
 import * as A from "./state/actions";
@@ -73,6 +74,7 @@ export function App() {
 
   useEffect(() => {
     initInbox();
+    initUpdates();
   }, []);
 
   useEffect(() => {

@@ -20,6 +20,7 @@ npm run typecheck      # tsc --noEmit
 npm run tauri:build    # release exe + NSIS and MSI installers in src-tauri/target/release/bundle
 npm run e2e            # acceptance test against the built exe (see scripts/e2e-acceptance.mjs)
 npm run e2e:phone      # phone link → photo inbox → crop → Copy for ChatGPT (overwrites the clipboard)
+npm run release -- --notes "…"   # signed build + GitHub release (desktop updater and Android app update from it)
 npm run build:apk      # Android app → src-tauri/phone/maree-phone.apk (embedded in the exe; run before tauri build)
 node scripts/build-apk.mjs --debug && node scripts/e2e-android.mjs   # on a running emulator
 node scripts/ui-shots.mjs <outDir> tour|acceptance [theme]   # headless Edge screenshots of the dev server
@@ -82,6 +83,12 @@ Key decisions:
   and answer crops are appended to My Solution as `![My answer](attachment:…)`.
   Processed photos move to `files/inbox/archive` (pruned after 30 days). A watched folder
   (e.g. Google Drive) is read-only: collected photos are remembered by hash.
+* **Updates come from GitHub Releases** (github.com/ouyang-matters/maree). The desktop
+  updater (tauri-plugin-updater) installs only packages signed with the key in
+  ~/.maree-updater (public key in tauri.conf.json); the Android app reads android.json,
+  checks the SHA-256 and hands the APK to Android, which requires the same signing key
+  (~/.maree-android). Bump the version in package.json, tauri.conf.json and Cargo.toml,
+  commit, then `npm run release`.
 * **Copy for ChatGPT** places separate image files on the clipboard (CF_HDROP). Chromium
   pastes a file list as separate attachments and ignores text alongside it, so typed text is
   rendered to an image rather than sent as text.

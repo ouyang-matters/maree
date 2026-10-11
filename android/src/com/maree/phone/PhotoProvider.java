@@ -17,8 +17,11 @@ import java.util.regex.Pattern;
 public class PhotoProvider extends ContentProvider {
     static final Pattern NAME = Pattern.compile("IMG_[0-9]+\\.jpg");
 
+    static final String UPDATE = "maree-update.apk";
+
     File file(Uri uri) throws FileNotFoundException {
         String name = uri.getLastPathSegment();
+        if (UPDATE.equals(name)) return new File(new File(getContext().getCacheDir(), "updates"), UPDATE);
         if (name == null || !NAME.matcher(name).matches()) throw new FileNotFoundException(String.valueOf(uri));
         File dir = new File(getContext().getCacheDir(), "camera");
         dir.mkdirs();
@@ -33,6 +36,7 @@ public class PhotoProvider extends ContentProvider {
     @Override
     public ParcelFileDescriptor openFile(Uri uri, String mode) throws FileNotFoundException {
         File f = file(uri);
+        if (UPDATE.equals(f.getName()) && !mode.equals("r")) throw new FileNotFoundException("read-only");
         if (mode.contains("w") && !f.exists()) {
             try {
                 f.createNewFile();
@@ -57,6 +61,7 @@ public class PhotoProvider extends ContentProvider {
 
     @Override
     public String getType(Uri uri) {
+        if (UPDATE.equals(uri.getLastPathSegment())) return "application/vnd.android.package-archive";
         return "image/jpeg";
     }
 

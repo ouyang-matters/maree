@@ -123,6 +123,8 @@ export interface Settings {
   phonePort: number;
   /** Optional folder (e.g. synced by Google Drive) whose new photos are collected into the inbox. */
   inboxFolder: string;
+  /** Look for new versions on GitHub Releases. */
+  autoUpdate: boolean;
 }
 
 export interface Layout {
@@ -179,6 +181,8 @@ export interface State {
 
   inbox: InboxItem[];
   phone: { status: PhoneLinkStatus | null; error: string | null };
+  /** A newer version found by the updater. */
+  update: { version: string; notes: string; installing?: boolean } | null;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -195,6 +199,7 @@ export const DEFAULT_SETTINGS: Settings = {
   phoneKey: "",
   phonePort: 47147,
   inboxFolder: "",
+  autoUpdate: true,
 };
 
 export const DEFAULT_LAYOUT: Layout = {
@@ -245,6 +250,7 @@ export const useStore = create<State>()(() => ({
   layout: DEFAULT_LAYOUT,
   inbox: [],
   phone: { status: null, error: null },
+  update: null,
 }));
 
 export const get = () => useStore.getState();

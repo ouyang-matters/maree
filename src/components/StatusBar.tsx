@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { Database, Moon, Sun } from "lucide-react";
+import { Database, Moon, RefreshCw, Sun } from "lucide-react";
+import { installUpdate } from "../state/updates";
 import { useStore } from "../state/store";
 import * as A from "../state/actions";
 import { flushAutosave } from "../state/autosave";
@@ -13,6 +14,7 @@ export function StatusBar() {
   const lastSavedAt = useStore((s) => s.lastSavedAt);
   const theme = useStore((s) => s.settings.theme);
   const info = useStore((s) => s.info);
+  const update = useStore((s) => s.update);
   const hasSample = useStore((s) => s.hasSample);
   const stats = useMemo(() => {
     const live = problems.filter((p) => !p.deletedAt);
@@ -50,6 +52,11 @@ export function StatusBar() {
         </button>
       )}
       <span className="grow" />
+      {update && (
+        <button className="sb-btn sb-update" disabled={update.installing} onClick={() => void installUpdate()} title={update.notes || undefined}>
+          <RefreshCw size={12} /> {update.installing ? t("Updating…") : t("Restart to update to {v}", { v: update.version })}
+        </button>
+      )}
       <button className="sb-btn" title={lastSavedAt ? t("Last saved {time}", { time: fmtTime(lastSavedAt) }) : undefined} onClick={() => flushAutosave()}>
         <span className={`save-dot ${saveState}`} />
         {saveLabel}

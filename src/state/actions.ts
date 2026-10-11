@@ -220,7 +220,7 @@ function scheduleSessionSave() {
   sessionTimer = setTimeout(() => void persistSession(), 800);
 }
 
-async function persistSession(): Promise<void> {
+export async function persistSession(): Promise<void> {
   if (!repo) return;
   const s = get();
   const groups = s.groups.map((g) => ({
