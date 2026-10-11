@@ -1,0 +1,59 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb}
+\usepackage[margin=1in]{geometry}
+\usepackage{enumitem}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\pagestyle{plain}
+\begin{document}
+
+\begin{center}
+{\Large MATH 147 --- Proof Practice}\\[2pt]
+Lectures 7--12 \quad Fall 2026
+\end{center}
+
+\noindent Attempt each problem before looking at the hints in lecture. Write complete proofs.
+
+\section*{Lecture 7 --- Convergence and Boundedness}
+
+\noindent\textbf{Problem 1.} Prove directly from the definition that
+\[
+  \lim_{n\to\infty} \frac{3n+1}{n+2} = 3.
+\]
+
+\noindent\textbf{Problem 2.} Let $(x_n)$ be a convergent sequence. Prove that $(x_n)$ is bounded, that is, there exists $M > 0$ with $|x_n| \le M$ for all $n \in \mathbb{N}$.
+
+\section*{Lecture 8 --- Algebra of Limits}
+
+\noindent\textbf{Problem 3.} Suppose $x_n \to x$ and $y_n \to y$. Prove that $x_n y_n \to xy$ using the triangle inequality.
+
+\noindent\textbf{Problem 4.} Let $x_n \to L$ with $L > 0$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that there exists $N \in \mathbb{N}$ such that $x_n > L/2$ for all $n \ge N$.
+  \item Deduce that $\sqrt{x_n} \to \sqrt{L}$.
+\end{enumerate}
+
+\section*{Lecture 9 --- Monotone Sequences}
+
+\noindent\textbf{Problem 5.} Define $x_1 = 1$ and $x_{n+1} = \sqrt{2 + x_n}$ for $n \ge 1$. Prove that the recursive sequence $(x_n)$ is increasing and bounded, and find its limit.
+
+\noindent\textbf{Problem 6.} Let $a_n = \left(1 + \frac{1}{n}\right)^n$. Show that $(a_n)$ is increasing and bounded above by $3$, and conclude that it converges.
+
+\section*{Lecture 10 --- Subsequences}
+
+\noindent\textbf{Problem 7.} Prove that if every subsequence of $(x_n)$ has a further subsequence converging to $L$, then $x_n \to L$.
+
+\section*{Lecture 11 --- Bolzano--Weierstrass}
+
+\noindent\textbf{Problem 8.} Use the Bolzano--Weierstrass theorem to show that every bounded sequence $(x_n)$ has a convergent subsequence whose limit lies in the interval $[\inf_n x_n, \sup_n x_n]$.
+
+\section*{Lecture 12 --- Cauchy Sequences}
+
+\noindent\textbf{Problem 9.} Suppose $|x_{n+1} - x_n| \le 2^{-n}$ for all $n \in \mathbb{N}$. Prove that $(x_n)$ is a Cauchy sequence.
+
+\noindent\textbf{Problem 10.} For bounded sequences $(x_n)$ and $(y_n)$, prove that
+\[
+  \limsup_{n\to\infty} (x_n + y_n) \le \limsup_{n\to\infty} x_n + \limsup_{n\to\infty} y_n.
+\]
+
+\end{document}
