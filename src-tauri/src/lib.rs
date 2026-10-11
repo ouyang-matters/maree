@@ -1,7 +1,10 @@
 //! Marée desktop shell: window, local SQLite bridge, file storage and backups.
 
+mod clip;
 mod db;
 mod files;
+mod inbox;
+mod phone;
 
 use db::{err, Db, ExecResult, Stmt};
 use files::StoredFile;
@@ -249,7 +252,7 @@ fn header(request: &Request<'_>, key: &str) -> Result<String, String> {
     Ok(percent_decode(raw))
 }
 
-fn percent_decode(s: &str) -> String {
+pub(crate) fn percent_decode(s: &str) -> String {
     let bytes = s.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;
@@ -306,6 +309,107 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
     fs::rename(&tmp, path).map_err(err)
 }
 
+// ------------------------------------------------------- phone and inbox
+
+fn optional_header(request: &Request<'_>, key: &str) -> String {
+    header(request, key).unwrap_or_default()
+}
+
+#[tauri::command(async)]
+fn phone_start(app: tauri::AppHandle, link: State<'_, phone::PhoneLink>, paths: State<'_, Paths>, token: String, port: u16) -> Result<phone::LinkStatus, String> {
+    link.start(app, inbox::inbox_dir(&paths.files_dir), token, port)
+}
+
+#[tauri::command(async)]
+fn phone_stop(link: State<'_, phone::PhoneLink>) {
+    link.stop()
+}
+
+#[tauri::command(async)]
+fn phone_status(link: State<'_, phone::PhoneLink>) -> Option<phone::LinkStatus> {
+    link.status()
+}
+
+#[tauri::command(async)]
+fn phone_set_context(link: State<'_, phone::PhoneLink>, json: String) {
+    link.set_context(json)
+}
+
+#[tauri::command(async)]
+fn inbox_list(paths: State<'_, Paths>) -> Vec<inbox::InboxItem> {
+    inbox::list(&inbox::inbox_dir(&paths.files_dir))
+}
+
+#[tauri::command(async)]
+fn inbox_read(paths: State<'_, Paths>, id: String) -> Result<Response, String> {
+    Ok(Response::new(inbox::read(&inbox::inbox_dir(&paths.files_dir), &id)?))
+}
+
+#[tauri::command(async)]
+fn inbox_archive(paths: State<'_, Paths>, id: String) -> Result<(), String> {
+    inbox::archive(&inbox::inbox_dir(&paths.files_dir), &id)
+}
+
+#[tauri::command(async)]
+fn inbox_restore(paths: State<'_, Paths>, id: String) -> Result<(), String> {
+    inbox::restore(&inbox::inbox_dir(&paths.files_dir), &id)
+}
+
+/// Raw-body upload from the desktop itself: headers `x-name`, `x-kind`, `x-problem`.
+#[tauri::command(async)]
+fn inbox_add(paths: State<'_, Paths>, request: Request<'_>) -> Result<inbox::InboxItem, String> {
+    let InvokeBody::Raw(bytes) = request.body() else {
+        return Err("expected raw bytes".into());
+    };
+    let problem = optional_header(&request, "x-problem");
+    inbox::add(
+        &inbox::inbox_dir(&paths.files_dir),
+        inbox::NewItem {
+            bytes,
+            kind: &optional_header(&request, "x-kind"),
+            problem_id: if problem.is_empty() { None } else { Some(problem) },
+            note: "",
+            origin: "desktop",
+            original_name: &optional_header(&request, "x-name"),
+        },
+    )
+}
+
+#[tauri::command(async)]
+fn inbox_collect_folder(paths: State<'_, Paths>, folder: String) -> Result<inbox::CollectResult, String> {
+    inbox::collect_folder(&inbox::inbox_dir(&paths.files_dir), Path::new(&folder))
+}
+
+#[derive(serde::Deserialize)]
+struct ClipPart {
+    name: String,
+    len: usize,
+    /// "file", "png" (combined picture) or "bmp" (the same as a bitmap).
+    role: String,
+}
+
+/// Raw body = the parts concatenated; header `x-manifest` (URI-encoded JSON) describes them.
+#[tauri::command(async)]
+fn clipboard_copy_images(paths: State<'_, Paths>, request: Request<'_>) -> Result<usize, String> {
+    let InvokeBody::Raw(bytes) = request.body() else {
+        return Err("expected raw bytes".into());
+    };
+    let parts: Vec<ClipPart> = serde_json::from_str(&header(&request, "x-manifest")?).map_err(err)?;
+    let (mut files, mut png, mut bmp) = (Vec::new(), None, None);
+    let mut at = 0usize;
+    for p in parts {
+        let end = at.checked_add(p.len).filter(|e| *e <= bytes.len()).ok_or("clipboard data is truncated")?;
+        let chunk = &bytes[at..end];
+        match p.role.as_str() {
+            "png" => png = Some(chunk),
+            "bmp" => bmp = Some(chunk),
+            _ => files.push((p.name, chunk.to_vec())),
+        }
+        at = end;
+    }
+    clip::copy_images(&paths.data_dir.join("clipboard"), &files, png, bmp)
+}
+
 // ----------------------------------------------------------------- backups
 
 #[tauri::command(async)]
@@ -356,6 +460,8 @@ pub fn run() {
                 eprintln!("automatic snapshot failed: {e}");
             }
             app.manage(Db { conn: Mutex::new(conn), path: db_path });
+            inbox::prune_archive(&inbox::inbox_dir(&paths.files_dir));
+            app.manage(phone::PhoneLink::default());
             app.manage(paths);
             Ok(())
         })
@@ -375,6 +481,17 @@ pub fn run() {
             write_binary_file,
             create_backup_archive,
             read_backup_archive,
+            phone_start,
+            phone_stop,
+            phone_status,
+            phone_set_context,
+            inbox_list,
+            inbox_read,
+            inbox_archive,
+            inbox_restore,
+            inbox_add,
+            inbox_collect_folder,
+            clipboard_copy_images,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Marée");

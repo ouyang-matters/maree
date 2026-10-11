@@ -16,6 +16,7 @@ export function menuBar(): MenuDef[] {
         "course.new",
         "-",
         "import.files",
+        "inbox.add",
         "import.library",
         "backup.restore",
         "-",
@@ -42,6 +43,7 @@ export function menuBar(): MenuDef[] {
         "edit.selectAll",
         "-",
         "search.focus",
+        "problem.copyChatGpt",
         "problem.copyMarkdown",
         "problem.copyLatex",
         "-",
@@ -76,6 +78,7 @@ export function menuBar(): MenuDef[] {
         "nav.all",
         "nav.review",
         "nav.recent",
+        "inbox.open",
         "nav.importReview",
         "nav.trash",
         "-",
@@ -94,7 +97,7 @@ export function menuBar(): MenuDef[] {
     },
     {
       label: t("Tools"),
-      items: ["progress", "-", "tools.reindex", "tools.snapshot", "tools.dataFolder", "-", "settings"],
+      items: ["progress", "phone.connect", "-", "tools.reindex", "tools.snapshot", "tools.dataFolder", "-", "settings"],
     },
     {
       label: t("Help"),

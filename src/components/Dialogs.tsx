@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { PhoneDialog } from "./PhoneDialog";
 import { useStore, get } from "../state/store";
 import * as A from "../state/actions";
 import { Dialog } from "../ui/Dialog";
@@ -808,6 +809,8 @@ export function Dialogs() {
       return <DeleteCourseDialog courseId={d.courseId} />;
     case "about":
       return <AboutDialog />;
+    case "phone":
+      return <PhoneDialog />;
     case "prompt":
       return <PromptDialog {...d} />;
   }

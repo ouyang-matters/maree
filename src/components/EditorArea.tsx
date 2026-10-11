@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BarChart3, Columns2, FileInput, FileText, HelpCircle, Inbox, Rows2, Settings, Sparkles, X } from "lucide-react";
+import { BarChart3, Columns2, FileInput, FileText, HelpCircle, Images, Inbox, Rows2, Settings, Sparkles, X } from "lucide-react";
 import { useStore, get, type Tab } from "../state/store";
 import * as A from "../state/actions";
 import { problemLabel } from "../domain/filters";
@@ -15,6 +15,7 @@ import { ProgressView } from "./ProgressView";
 import { SettingsView } from "./SettingsView";
 import { WelcomeView } from "./WelcomeView";
 import { HelpView } from "./HelpView";
+import { InboxView } from "./InboxView";
 import { t } from "../i18n";
 
 function TabLabel({ tab }: { tab: Tab }) {
@@ -75,6 +76,13 @@ function TabLabel({ tab }: { tab: Tab }) {
           <span className="tab-label">{t("Help")}</span>
         </>
       );
+    case "inbox":
+      return (
+        <>
+          <Images size={13} />
+          <span className="tab-label">{t("Photo Inbox")}</span>
+        </>
+      );
   }
 }
 
@@ -94,6 +102,8 @@ function TabBody({ tab }: { tab: Tab }) {
       return <WelcomeView />;
     case "help":
       return <HelpView />;
+    case "inbox":
+      return <InboxView />;
   }
 }
 

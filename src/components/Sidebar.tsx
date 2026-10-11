@@ -16,7 +16,9 @@ import {
   NotebookText,
   Plus,
   Trash2,
+  Images,
 } from "lucide-react";
+import { openInbox } from "../state/inbox";
 import { useStore, get } from "../state/store";
 import * as A from "../state/actions";
 import { openContextMenu, type MenuItem } from "../ui/Menu";
@@ -169,6 +171,12 @@ export function Sidebar() {
   const listMode = useStore((s) => s.listMode);
   const activeViewId = useStore((s) => s.activeViewId);
   const layoutCollapsed = useStore((s) => s.layout.collapsed);
+  const inboxCount = useStore((s) => s.inbox.length);
+  const phoneOn = useStore((s) => !!s.phone.status);
+  const inboxInFront = useStore((s) => {
+    const g = s.groups[s.activeGroup];
+    return g?.tabs.find((x) => x.id === g.activeId)?.kind === "inbox";
+  });
   const [openTopics, setOpenTopics] = useState<Record<string, boolean>>({});
   const [showArchived, setShowArchived] = useState(false);
 
@@ -448,6 +456,9 @@ export function Sidebar() {
         <Item icon={<BookOpen size={15} />} label={t("All Problems")} count={counts.all} active={isActive("all")} onClick={A.showAll} />
         <Item icon={<Inbox size={15} />} label={t("Review Queue")} count={counts.review} active={listMode === "review"} onClick={A.showReview} />
         <Item icon={<Clock3 size={15} />} label={t("Recently Edited")} active={listMode === "recent"} onClick={A.showRecent} />
+        {(inboxCount > 0 || phoneOn) && (
+          <Item icon={<Images size={15} />} label={t("Photo Inbox")} count={inboxCount || undefined} active={inboxInFront} onClick={openInbox} />
+        )}
         {counts.importReview > 0 && (
           <Item icon={<AlertTriangle size={14} />} label={t("Needs Import Review")} count={counts.importReview} active={isActive("import-review")} onClick={A.showImportReview} />
         )}

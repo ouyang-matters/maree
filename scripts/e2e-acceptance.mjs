@@ -43,6 +43,8 @@ async function launch() {
       MAREE_DATA_DIR: dataDir,
       MAREE_E2E: "1",
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}`,
+      // A separate web view profile, so the test also runs while Marée itself is open.
+      WEBVIEW2_USER_DATA_FOLDER: `${dataDir}-webview`,
     },
     stdio: "ignore",
   });
@@ -87,7 +89,8 @@ await page.getByLabel("First lecture").fill("7");
 await page.getByLabel("Last lecture").fill("12");
 await page.locator(".ob-step", { hasText: "Add lectures" }).getByRole("button", { name: "Add" }).click();
 await page.waitForTimeout(500);
-const lectures = await page.locator(".sb-section", { hasText: "Lectures" }).locator(".sb-item").allInnerTexts();
+// Lectures are listed under their course in the sidebar.
+const lectures = await page.locator(".sb-course-body .sb-item:has(.lec-num)").allInnerTexts();
 check("3. Add Lectures 7–12", lectures.length === 6, lectures.map((l) => l.split("\n")[0]).join(", "));
 
 await page.getByLabel("Topics, separated by commas").fill("MCT, Subsequences, Cauchy Sequences");

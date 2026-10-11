@@ -1,4 +1,6 @@
 import { useEffect, useRef } from "react";
+import { addPhotos, initInbox } from "./state/inbox";
+import { inboxInFront } from "./components/InboxView";
 import { useStore } from "./state/store";
 import * as A from "./state/actions";
 import { platform } from "./platform";
@@ -53,10 +55,11 @@ function DropOverlay() {
 export function App() {
   const layout = useStore((s) => s.layout);
   const locale = useStore((s) => s.settings.locale);
-  // The import wizard needs the width: the problem list steps aside while it is in front.
+  // The import wizard and the photo inbox need the width: the problem list steps aside.
   const importInFront = useStore((s) => {
     const g = s.groups[s.activeGroup];
-    return g?.tabs.find((x) => x.id === g.activeId)?.kind === "import";
+    const kind = g?.tabs.find((x) => x.id === g.activeId)?.kind;
+    return kind === "import" || kind === "inbox";
   });
   const listOpen = layout.listOpen && !importInFront;
   const sidebarRef = useRef(layout.sidebarWidth);
@@ -69,6 +72,10 @@ export function App() {
   }, [locale]);
 
   useEffect(() => {
+    initInbox();
+  }, []);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (useStore.getState().palette.open || useStore.getState().dialog) return;
       handleGlobalKey(e);
@@ -76,7 +83,10 @@ export function App() {
     window.addEventListener("keydown", onKey);
     const off = platform().onFileDrop(
       (files) => {
-        if (files.length) void A.startImport(files);
+        if (!files.length) return;
+        // Photos dropped on the inbox wait there to be cropped; everything else is imported.
+        if (inboxInFront() && files.every((f) => /\.(jpe?g|png|webp)$/i.test(f.name))) void addPhotos(files);
+        else void A.startImport(files);
       },
       (over) => useStore.setState({ dropActive: over }),
     );

@@ -2,10 +2,11 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { openPath, openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import type { SqlDriver, SqlParam, Statement } from "../data/driver";
-import type { AppInfo, BackupContents, PickedFile, Platform, StoredFileInfo } from "./types";
+import type { AppInfo, BackupContents, ClipboardImage, InboxItem, PhoneBridge, PickedFile, Platform, StoredFileInfo } from "./types";
 import { html5FileDrop } from "./dom-drop";
 
 const driver: SqlDriver = {
@@ -42,6 +43,47 @@ async function write(path: string, data: string | Uint8Array): Promise<void> {
   else await invoke("write_binary_file", data, { headers: { "x-path": encodeURIComponent(path) } });
 }
 
+const inbox: PhoneBridge = {
+  start: (token, port) => invoke("phone_start", { token, port }),
+  stop: () => invoke("phone_stop"),
+  status: () => invoke("phone_status"),
+  setContext: (json) => invoke("phone_set_context", { json }),
+  list: () => invoke<InboxItem[]>("inbox_list"),
+  read: async (id) => new Uint8Array(await invoke<ArrayBuffer>("inbox_read", { id })),
+  archive: (id) => invoke("inbox_archive", { id }),
+  restore: (id) => invoke("inbox_restore", { id }),
+  add: (name, bytes, kind, problemId) =>
+    invoke<InboxItem>("inbox_add", bytes, {
+      headers: { "x-name": encodeURIComponent(name), "x-kind": kind, "x-problem": encodeURIComponent(problemId ?? "") },
+    }),
+  collectFolder: (folder) => invoke("inbox_collect_folder", { folder }),
+  onChanged(cb) {
+    let off: (() => void) | null = null;
+    let cancelled = false;
+    void listen("inbox-changed", () => cb()).then((u) => (cancelled ? u() : (off = u)));
+    return () => {
+      cancelled = true;
+      off?.();
+    };
+  },
+};
+
+async function copyImages(files: ClipboardImage[], combined: { png: Uint8Array; bmp: Uint8Array | null } | null): Promise<void> {
+  const parts: { name: string; len: number; role: string; bytes: Uint8Array }[] = files.map((f) => ({ name: f.name, len: f.bytes.length, role: "file", bytes: f.bytes }));
+  if (combined) {
+    parts.push({ name: "combined.png", len: combined.png.length, role: "png", bytes: combined.png });
+    if (combined.bmp) parts.push({ name: "combined.bmp", len: combined.bmp.length, role: "bmp", bytes: combined.bmp });
+  }
+  const body = new Uint8Array(parts.reduce((n, p) => n + p.len, 0));
+  let at = 0;
+  for (const p of parts) {
+    body.set(p.bytes, at);
+    at += p.len;
+  }
+  const manifest = JSON.stringify(parts.map(({ name, len, role }) => ({ name, len, role })));
+  await invoke("clipboard_copy_images", body, { headers: { "x-manifest": encodeURIComponent(manifest) } });
+}
+
 export function createTauriPlatform(): Platform {
   const win = getCurrentWindow();
   let info: AppInfo | null = null;
@@ -58,6 +100,12 @@ export function createTauriPlatform(): Platform {
       return filesFromPaths(Array.isArray(res) ? res : [res]);
     },
     readPaths: filesFromPaths,
+    inbox,
+    copyImages,
+    async pickFolder(title) {
+      const res = await openDialog({ directory: true, multiple: false, title });
+      return typeof res === "string" ? res : null;
+    },
     async storeFile(kind, name, bytes, path): Promise<StoredFileInfo> {
       if (path) return invoke("store_file_from_path", { path, kind });
       return invoke("store_file_bytes", bytes ?? new Uint8Array(), {

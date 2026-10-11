@@ -14,7 +14,7 @@ import type {
 } from "../data/types";
 import type { LibraryIndex } from "../domain/filters";
 import { buildIndex } from "../domain/filters";
-import type { AppInfo } from "../platform/types";
+import type { AppInfo, InboxItem, PhoneLinkStatus } from "../platform/types";
 import type { CommitResult, DocPlan } from "../import/pipeline";
 import type { Locale } from "../i18n";
 import type { LibraryJson } from "../export/library-json";
@@ -28,7 +28,8 @@ export type Tab =
   | { id: string; kind: "progress" }
   | { id: string; kind: "settings" }
   | { id: string; kind: "welcome" }
-  | { id: string; kind: "help" };
+  | { id: string; kind: "help" }
+  | { id: string; kind: "inbox" };
 
 export interface EditorGroup {
   id: string;
@@ -95,6 +96,7 @@ export type DialogSpec =
   | { kind: "review-date"; problemIds: string[] }
   | { kind: "delete-course"; courseId: string }
   | { kind: "about" }
+  | { kind: "phone" }
   | { kind: "prompt"; title: string; label: string; value: string; allowEmpty?: boolean; onSubmit: (v: string) => unknown };
 
 export interface Toast {
@@ -114,6 +116,13 @@ export interface Settings {
   spellcheck: boolean;
   onboardingDone: boolean;
   confirmTrash: boolean;
+  /** Serve the phone page on the local network while the app is open. */
+  phoneLink: boolean;
+  /** Pairing key carried by the QR code; changing it unpairs every phone. */
+  phoneKey: string;
+  phonePort: number;
+  /** Optional folder (e.g. synced by Google Drive) whose new photos are collected into the inbox. */
+  inboxFolder: string;
 }
 
 export interface Layout {
@@ -167,6 +176,9 @@ export interface State {
 
   settings: Settings;
   layout: Layout;
+
+  inbox: InboxItem[];
+  phone: { status: PhoneLinkStatus | null; error: string | null };
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -179,6 +191,10 @@ export const DEFAULT_SETTINGS: Settings = {
   spellcheck: false,
   onboardingDone: false,
   confirmTrash: false,
+  phoneLink: false,
+  phoneKey: "",
+  phonePort: 47147,
+  inboxFolder: "",
 };
 
 export const DEFAULT_LAYOUT: Layout = {
@@ -227,6 +243,8 @@ export const useStore = create<State>()(() => ({
   lastSavedAt: null,
   settings: DEFAULT_SETTINGS,
   layout: DEFAULT_LAYOUT,
+  inbox: [],
+  phone: { status: null, error: null },
 }));
 
 export const get = () => useStore.getState();

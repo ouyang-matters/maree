@@ -33,7 +33,12 @@ import {
   Trash2,
   Waves,
   X,
+  ClipboardCopy,
+  Images,
+  ImagePlus,
+  Smartphone,
 } from "lucide-react";
+import { addPhotos, copyForChatGpt, openInbox } from "../state/inbox";
 import { get, activeProblemId, set } from "../state/store";
 import * as A from "../state/actions";
 import { STATUSES, type Status } from "../data/types";
@@ -129,10 +134,19 @@ export function buildCommands(): Command[] {
     { id: "edit.selectAll", label: t("Select All"), category: t("Edit"), shortcut: "Ctrl+A", run: editSelectAll, hidden: true },
     { id: "search.focus", label: t("Find in Library"), category: t("Edit"), shortcut: "Ctrl+F", icon: <Search size={15} />, run: focusSearch, global: true },
     {
+      id: "problem.copyChatGpt",
+      label: t("Copy for ChatGPT"),
+      category: t("Edit"),
+      shortcut: "Ctrl+Shift+C",
+      icon: <ClipboardCopy size={15} />,
+      run: () => targetIds()[0] && copyForChatGpt(targetIds()[0]),
+      enabled: hasTarget,
+      global: true,
+    },
+    {
       id: "problem.copyMarkdown",
       label: t("Copy Problem and Solution as Markdown"),
       category: t("Edit"),
-      shortcut: "Ctrl+Shift+C",
       icon: <Copy size={15} />,
       run: () => targetIds()[0] && A.copyProblemAs(targetIds()[0], "solution", "md"),
       enabled: hasTarget,
@@ -212,6 +226,9 @@ export function buildCommands(): Command[] {
     { id: "nav.all", label: t("All Problems"), category: t("Go"), shortcut: "Ctrl+1", icon: <BookOpen size={15} />, run: A.showAll, global: true },
     { id: "nav.review", label: t("Review Queue"), category: t("Go"), shortcut: "Ctrl+2", icon: <Inbox size={15} />, run: A.showReview, global: true },
     { id: "nav.recent", label: t("Recently Edited"), category: t("Go"), shortcut: "Ctrl+3", icon: <History size={15} />, run: A.showRecent, global: true },
+    { id: "inbox.open", label: t("Photo Inbox"), category: t("Go"), shortcut: "Ctrl+4", icon: <Images size={15} />, run: openInbox, global: true },
+    { id: "inbox.add", label: t("Add Photos to Inbox…"), category: t("File"), icon: <ImagePlus size={15} />, run: () => addPhotos() },
+    { id: "phone.connect", label: t("Connect Phone…"), category: t("Tools"), icon: <Smartphone size={15} />, run: () => A.openDialog({ kind: "phone" }) },
     { id: "nav.trash", label: t("Trash"), category: t("Go"), icon: <Trash2 size={15} />, run: A.showTrash },
     { id: "nav.importReview", label: t("Problems Needing Import Review"), category: t("Go"), run: A.showImportReview },
     { id: "lecture.new", label: t("Add Lectures…"), category: t("Library"), run: () => {

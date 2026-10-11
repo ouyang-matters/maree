@@ -4,7 +4,7 @@
 import type { Database, SqlJsStatic } from "sql.js";
 import JSZip from "jszip";
 import type { SqlDriver, SqlParam, Statement } from "../data/driver";
-import type { AppInfo, Platform } from "./types";
+import type { AppInfo, InboxItem, PhoneBridge, Platform } from "./types";
 import { fileFromDom, html5FileDrop } from "./dom-drop";
 
 const DB_NAME = "maree";
@@ -241,7 +241,57 @@ export async function createWebPlatform(): Promise<Platform> {
         window.addEventListener("pagehide", () => void beforeClose());
       },
     },
+    inbox: memoryInbox(),
+    async copyImages(_files, combined) {
+      // Browsers can only place one image on the clipboard: use the combined picture.
+      if (!combined) return;
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": new Blob([combined.png as BlobPart], { type: "image/png" }) })]);
+    },
     onFileDrop: html5FileDrop,
   };
   return platform;
+}
+
+/** Browser preview: the inbox lives in memory and there is no phone link. */
+function memoryInbox(): PhoneBridge {
+  const items = new Map<string, { item: InboxItem; bytes: Uint8Array }>();
+  const archived = new Map<string, { item: InboxItem; bytes: Uint8Array }>();
+  const listeners = new Set<() => void>();
+  let n = 0;
+  return {
+    start: async () => {
+      throw new Error("The phone link needs the desktop app.");
+    },
+    stop: async () => {},
+    status: async () => null,
+    setContext: async () => {},
+    list: async () => [...items.values()].map((v) => v.item),
+    read: async (id) => {
+      const v = items.get(id);
+      if (!v) throw new Error("This photo is no longer in the inbox.");
+      return v.bytes;
+    },
+    archive: async (id) => {
+      const v = items.get(id);
+      if (v) archived.set(id, v);
+      items.delete(id);
+    },
+    restore: async (id) => {
+      const v = archived.get(id);
+      if (v) items.set(id, v);
+      archived.delete(id);
+    },
+    add: async (name, bytes, kind, problemId) => {
+      const id = `${Date.now()}-${++n}`;
+      const item: InboxItem = { id, fileName: name, kind, problemId: problemId ?? null, note: "", origin: "desktop", originalName: name, receivedAt: Date.now(), size: bytes.length, hash: id };
+      items.set(id, { item, bytes });
+      listeners.forEach((l) => l());
+      return item;
+    },
+    collectFolder: async () => ({ added: 0, skippedHeic: 0 }),
+    onChanged(cb) {
+      listeners.add(cb);
+      return () => listeners.delete(cb);
+    },
+  };
 }

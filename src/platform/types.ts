@@ -37,6 +37,47 @@ export interface BackupContents {
   filesSkipped: number;
 }
 
+/** A photo waiting in the inbox (sent from the phone, a watched folder or added here). */
+export interface InboxItem {
+  id: string;
+  fileName: string;
+  kind: "question" | "answer" | "unknown";
+  problemId: string | null;
+  note: string;
+  origin: "phone" | "folder" | "desktop";
+  originalName: string;
+  /** Milliseconds since the Unix epoch. */
+  receivedAt: number;
+  size: number;
+  hash: string;
+}
+
+export interface PhoneLinkStatus {
+  port: number;
+  /** Addresses the phone can open, most likely first (each includes the pairing key). */
+  urls: string[];
+}
+
+export interface ClipboardImage {
+  name: string;
+  bytes: Uint8Array;
+}
+
+/** The local-network link to the phone and the photo inbox (desktop; a stand-in in the browser). */
+export interface PhoneBridge {
+  start(key: string, port: number): Promise<PhoneLinkStatus>;
+  stop(): Promise<void>;
+  status(): Promise<PhoneLinkStatus | null>;
+  setContext(json: string): Promise<void>;
+  list(): Promise<InboxItem[]>;
+  read(id: string): Promise<Uint8Array>;
+  archive(id: string): Promise<void>;
+  restore(id: string): Promise<void>;
+  add(name: string, bytes: Uint8Array, kind: InboxItem["kind"], problemId?: string | null): Promise<InboxItem>;
+  collectFolder(folder: string): Promise<{ added: number; skippedHeic: number }>;
+  onChanged(cb: () => void): () => void;
+}
+
 export interface WindowControls {
   minimize(): void;
   toggleMaximize(): void;
@@ -69,5 +110,9 @@ export interface Platform {
   openDataFolder(): Promise<void>;
   openUrl(url: string): Promise<void>;
   window: WindowControls;
+  inbox: PhoneBridge;
+  /** Puts images on the clipboard as separate files (pasted as separate attachments), plus a combined picture. */
+  copyImages(files: ClipboardImage[], combined: { png: Uint8Array; bmp: Uint8Array | null } | null): Promise<void>;
+  pickFolder?(title: string): Promise<string | null>;
   onFileDrop(onDrop: (files: PickedFile[]) => void, onHover: (over: boolean) => void): () => void;
 }

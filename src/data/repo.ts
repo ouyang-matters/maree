@@ -1173,6 +1173,34 @@ export class Repo {
 
   // --------------------------------------------------------- attachments
 
+  private attachmentInsert(a: Omit<Attachment, "id" | "createdAt">, now: string): { id: string; statement: Statement } {
+    const id = newId("att");
+    return {
+      id,
+      statement: {
+        sql: `INSERT INTO attachments (id, problem_id, file_name, stored_path, mime, size, hash, caption, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        params: [id, a.problemId, a.fileName, a.storedPath, a.mime, a.size, a.hash, a.caption, now],
+      },
+    };
+  }
+
+  /** Creates a problem together with its attachments (e.g. a cropped photo of the statement). */
+  async createProblemWithAttachments(input: NewProblem, attachments: Omit<Attachment, "id" | "createdAt" | "problemId">[]): Promise<string> {
+    const now = nowIso();
+    const { id, statements } = this.problemInsert(input, now);
+    for (const a of attachments) statements.push(this.attachmentInsert({ ...a, problemId: id }, now).statement);
+    await this.tx(statements);
+    return id;
+  }
+
+  /** Adds an attachment and applies a patch (e.g. referencing it in the solution) in one transaction. */
+  async addAttachmentWithPatch(a: Omit<Attachment, "id" | "createdAt">, patch: ProblemPatch): Promise<string> {
+    const { id, statement } = this.attachmentInsert(a, nowIso());
+    await this.tx([statement, ...(await this.problemUpdateStatements(a.problemId, patch, true))]);
+    return id;
+  }
+
   async addAttachment(a: Omit<Attachment, "id" | "createdAt">): Promise<string> {
     const id = newId("att");
     const now = nowIso();

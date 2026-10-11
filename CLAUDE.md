@@ -19,6 +19,7 @@ npm run test:rust      # cargo tests for the SQL bridge, file store and backups
 npm run typecheck      # tsc --noEmit
 npm run tauri:build    # release exe + NSIS and MSI installers in src-tauri/target/release/bundle
 npm run e2e            # acceptance test against the built exe (see scripts/e2e-acceptance.mjs)
+npm run e2e:phone      # phone link → photo inbox → crop → Copy for ChatGPT (overwrites the clipboard)
 node scripts/ui-shots.mjs <outDir> tour|acceptance [theme]   # headless Edge screenshots of the dev server
 ```
 
@@ -31,14 +32,21 @@ src-tauri/src/
   lib.rs        window setup, data directory (MAREE_DATA_DIR / portable / %APPDATA%), commands
   db.rs         thin SQL bridge: db_select / db_execute / db_batch (one transaction) / snapshots
   files.rs      content-addressed file store (files/sources, files/attachments) and zip backups
+  phone.rs      phone link: tiny_http server on the LAN, pairing key, serves phone/index.html
+  inbox.rs      photo inbox (files/inbox: image + JSON sidecar), archive, watched-folder collection
+  clip.rs       clipboard with several images (CF_HDROP + PNG + bitmap) for "Copy for ChatGPT"
+src-tauri/phone/index.html   the phone page (plain HTML/JS, no build step, upload queue in IndexedDB)
 src/
   data/         driver.ts (SqlDriver), schema.ts (migrations), repo.ts (ALL SQL), types.ts, sample.ts
-  domain/       pure logic: filters & sorting, statuses, review queue, progress
+  domain/       pure logic: filters & sorting, statuses, review queue, progress, photos (crop regions, BMP)
+  image/        photo.ts: canvas decode / rotate / crop / stack
   math/         segments.ts (math-aware splitting), render.ts (markdown-it + KaTeX), unicode.ts
   import/       extract-{pdf,docx,latex,text,json}.ts → segment.ts → classify.ts / duplicates.ts → pipeline.ts
-  export/       library-json.ts (lossless JSON + import), documents.ts (Markdown / LaTeX)
+  export/       library-json.ts (lossless JSON + import), documents.ts (Markdown / LaTeX),
+                chatgpt.ts (problem + answer as images; typed text typeset via html-to-image)
   platform/     Platform interface; tauri.ts (Rust commands) and web.ts (sql.js + IndexedDB fallback)
-  state/        store.ts (zustand), actions.ts (every user operation), autosave.ts
+  state/        store.ts (zustand), actions.ts (every user operation), autosave.ts,
+                inbox.ts (phone link, photo inbox, crop → problems/answers, Copy for ChatGPT)
   commands/     commands.tsx (single registry for menus, palette, shortcuts), menus.ts
   components/   React views; ui/ holds primitives (Menu, Dialog, Popover, TagPicker, icons)
   styles/       tokens.css (themes), app.css (shell), views.css, prose.css (typeset maths + print)
@@ -61,6 +69,15 @@ Key decisions:
   opt-in and always flagged (`importFlags`) until the user marks it checked.
 * **No destructive defaults.** Deleting problems moves them to the Trash; deleting a
   course asks whether to keep its problems; library import uses UPSERTs and never deletes.
+* **Phone link stays on the local network.** The server only answers API calls carrying the
+  pairing key from the QR code; with `MAREE_E2E=1` it binds 127.0.0.1. Photos land in
+  `files/inbox`; cropping creates problems whose statement is `![Problem](attachment:…)`,
+  and answer crops are appended to My Solution as `![My answer](attachment:…)`.
+  Processed photos move to `files/inbox/archive` (pruned after 30 days). A watched folder
+  (e.g. Google Drive) is read-only: collected photos are remembered by hash.
+* **Copy for ChatGPT** places separate image files on the clipboard (CF_HDROP). Chromium
+  pastes a file list as separate attachments and ignores text alongside it, so typed text is
+  rendered to an image rather than sent as text.
 * **Commands are defined once** in `commands/commands.tsx`; the menu bar, palette and
   keyboard handler all read from it. Add new user actions there.
 * **zustand selectors must return stable values.** Never return a freshly filtered array

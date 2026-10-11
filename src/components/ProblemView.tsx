@@ -22,7 +22,10 @@ import {
   RotateCcw,
   Trash2,
   X,
+  ClipboardCopy,
 } from "lucide-react";
+import { copyForChatGpt } from "../state/inbox";
+import { attachmentImages } from "../domain/photos";
 import { useStore, get } from "../state/store";
 import * as A from "../state/actions";
 import type { Attempt, Category, HistoryEvent, Outcome, Problem, ProblemPart, Status } from "../data/types";
@@ -570,6 +573,11 @@ function PartCard({ p, part }: { p: Problem; part: ProblemPart }) {
 }
 
 function Attachments({ p }: { p: Problem }) {
+  // Images already shown in the statement or a solution are not repeated here.
+  const loose = useMemo(() => {
+    const shown = new Set([p.statement, p.solution, p.referenceSolution, p.notes, ...p.parts.flatMap((x) => [x.statement, x.solution, x.referenceSolution, x.notes])].flatMap(attachmentImages));
+    return p.attachments.filter((a) => !shown.has(a.fileName));
+  }, [p]);
   const [urls, setUrls] = useState<Record<string, string>>({});
   useEffect(() => {
     let alive = true;
@@ -611,9 +619,9 @@ function Attachments({ p }: { p: Problem }) {
           <ImagePlus size={13} /> {t("Add file")}
         </button>
       </div>
-      {p.attachments.length === 0 ? null : (
+      {loose.length === 0 ? null : (
         <div className="att-grid">
-          {p.attachments.map((a) => (
+          {loose.map((a) => (
             <figure
               key={a.id}
               className="att"
@@ -828,6 +836,9 @@ export function ProblemView({ problemId }: { problemId: string }) {
         <div className="pv-top">
           <Crumbs p={p} />
           <div className="row" style={{ gap: 2 }}>
+            <button className="icon-btn" title={t("Copy for ChatGPT (Ctrl+Shift+C)")} onClick={() => void copyForChatGpt(p.id)}>
+              <ClipboardCopy size={15} />
+            </button>
             {src?.storedPath && src.format === "pdf" && (
               <button className="icon-btn" title={t("Open source PDF beside (page {n})", { n: p.sourcePage ?? 1 })} onClick={() => A.openSource(src.id, p.sourcePage ?? undefined, true)}>
                 <FileText size={15} />

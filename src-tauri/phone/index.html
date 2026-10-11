@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fbf9f7">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Marée">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>Marée</title>
+<style>
+  :root {
+    --bg: #fbf9f7; --panel: #f5f2ef; --elev: #fff; --border: #e7e1dc; --text: #2b2629;
+    --text-2: #5f575c; --text-3: #968c91; --accent: #b03a6c; --accent-soft: #f7e7ee; --ok: #3f7a5a; --warn: #c4572f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1d1a1c; --panel: #242023; --elev: #2b2629; --border: #3a3438; --text: #ece6e9; --text-2: #b9afb4;
+      --text-3: #857b80; --accent: #e07aa6; --accent-soft: #3a2531; --ok: #7fbf98; --warn: #e5946f; }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body { font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom)); max-width: 560px; margin: 0 auto; }
+  header { display: flex; align-items: baseline; justify-content: space-between; margin: 4px 0 18px; }
+  h1 { margin: 0; font: italic 400 28px/1 Georgia, "Times New Roman", serif; letter-spacing: .01em; }
+  .conn { font-size: 13px; color: var(--text-3); display: flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); }
+  .conn.on .dot { background: var(--ok); }
+  .conn.off .dot { background: var(--warn); }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 3px; }
+  .seg button { border: 0; background: transparent; color: var(--text-2); font: inherit; font-size: 15px; padding: 9px 0; border-radius: 7px; }
+  .seg button.on { background: var(--elev); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); font-weight: 600; }
+  label.target { display: block; margin-top: 12px; font-size: 13px; color: var(--text-2); }
+  select { width: 100%; margin-top: 5px; font: inherit; font-size: 15px; padding: 10px; border-radius: 9px; border: 1px solid var(--border);
+    background: var(--elev); color: var(--text); }
+  .actions { display: grid; gap: 10px; margin: 18px 0 8px; }
+  .big { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 18px; border-radius: 12px;
+    font: inherit; font-size: 17px; font-weight: 600; border: 0; background: var(--accent); color: #fff; }
+  .big.secondary { background: var(--elev); color: var(--text); border: 1px solid var(--border); font-weight: 500; padding: 14px; }
+  .big:active { opacity: .85; }
+  .big svg { width: 22px; height: 22px; }
+  .hint { font-size: 13px; color: var(--text-3); margin: 6px 2px 18px; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-3); font-weight: 600; margin: 22px 2px 8px; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 10px; background: var(--elev); border: 1px solid var(--border); margin-bottom: 8px; }
+  li img { width: 52px; height: 52px; object-fit: cover; border-radius: 6px; background: var(--panel); flex: none; }
+  li .meta { flex: 1; min-width: 0; }
+  li .what { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  li .state { font-size: 13px; color: var(--text-3); }
+  li .state.ok { color: var(--ok); }
+  li .state.err { color: var(--warn); }
+  li button { font: inherit; font-size: 14px; border: 1px solid var(--border); background: var(--panel); color: var(--text); border-radius: 8px; padding: 6px 10px; }
+  .bar { height: 3px; background: var(--panel); border-radius: 2px; margin-top: 5px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .2s; }
+  .empty { color: var(--text-3); font-size: 14px; padding: 4px 2px; }
+  .pair { background: var(--elev); border: 1px solid var(--border); border-radius: 12px; padding: 18px; color: var(--text-2); }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Marée</h1>
+  <div id="conn" class="conn"><span class="dot"></span><span id="connText"></span></div>
+</header>
+
+<div id="pair" class="pair hidden"></div>
+
+<main id="main">
+  <div class="seg" role="radiogroup">
+    <button id="modeQ" class="on" role="radio" aria-checked="true" data-mode="question"></button>
+    <button id="modeA" role="radio" aria-checked="false" data-mode="answer"></button>
+  </div>
+  <label id="targetWrap" class="target hidden"><span id="targetLabel"></span>
+    <select id="target"></select>
+  </label>
+
+  <div class="actions">
+    <button id="shoot" class="big">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3.5"/></svg>
+      <span id="shootText"></span>
+    </button>
+    <button id="pick" class="big secondary">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
+      <span id="pickText"></span>
+    </button>
+  </div>
+  <p id="hint" class="hint"></p>
+  <input id="camera" type="file" accept="image/*" capture="environment" class="hidden">
+  <input id="library" type="file" accept="image/*" multiple class="hidden">
+
+  <h2 id="sentTitle"></h2>
+  <ul id="list"></ul>
+  <p id="empty" class="empty"></p>
+</main>
+
+<script>
+"use strict";
+const STRINGS = {
+  en: {
+    question: "Problem", answer: "My answer", shoot: "Take photo", pick: "Choose from photos",
+    hint: "Several problems on one page? Send the whole page and crop it on the computer.",
+    target: "Answer for", decide: "Decide on the computer", sent: "Sent to the computer", none: "Nothing sent yet.",
+    connected: "Connected", offline: "Computer not reachable", checking: "Connecting…",
+    waiting: "Waiting", sending: "Sending", done: "In the inbox", failed: "Not sent — will retry", retry: "Retry",
+    pair: "Open Marée on your computer, choose Tools → Connect Phone, and scan the QR code with this phone's camera.",
+    expired: "This phone is no longer paired. Scan the QR code in Marée again (Tools → Connect Phone).",
+    toobig: "Photo too large", unsupported: "Unsupported image"
+  },
+  "zh-Hant": {
+    question: "題目", answer: "我的解答", shoot: "拍照", pick: "從相簿選擇",
+    hint: "一頁有多道題？整頁拍下來，在電腦上再裁切。",
+    target: "這是哪一題的解答", decide: "在電腦上決定", sent: "已傳送到電腦", none: "還沒有傳送任何照片。",
+    connected: "已連線", offline: "連不到電腦", checking: "連線中…",
+    waiting: "等待中", sending: "傳送中", done: "已在收件匣", failed: "未傳送——稍後會重試", retry: "重試",
+    pair: "在電腦上打開 Marée，選擇「工具 → 連接手機」，再用這支手機的相機掃描 QR 碼。",
+    expired: "這支手機已不再配對。請在 Marée 中重新掃描 QR 碼（工具 → 連接手機）。",
+    toobig: "照片太大", unsupported: "不支援的圖片格式"
+  },
+  "zh-Hans": {
+    question: "题目", answer: "我的解答", shoot: "拍照", pick: "从相册选择",
+    hint: "一页有多道题？整页拍下来，在电脑上再裁切。",
+    target: "这是哪一题的解答", decide: "在电脑上决定", sent: "已发送到电脑", none: "还没有发送任何照片。",
+    connected: "已连接", offline: "连不上电脑", checking: "连接中…",
+    waiting: "等待中", sending: "发送中", done: "已在收件箱", failed: "未发送——稍后会重试", retry: "重试",
+    pair: "在电脑上打开 Marée，选择“工具 → 连接手机”，再用这部手机的相机扫描二维码。",
+    expired: "这部手机已不再配对。请在 Marée 中重新扫描二维码（工具 → 连接手机）。",
+    toobig: "照片太大", unsupported: "不支持的图片格式"
+  }
+};
+function pickLang(desktop) {
+  const nav = (navigator.languages || [navigator.language || "en"]).map((l) => l.toLowerCase());
+  for (const l of nav) {
+    if (/^zh-(tw|hk|mo)|^zh-hant/.test(l)) return "zh-Hant";
+    if (l.startsWith("zh")) return "zh-Hans";
+  }
+  return desktop === "zh" ? "zh-Hans" : "en";
+}
+let lang = pickLang("");
+const T = (k) => (STRINGS[lang] || STRINGS.en)[k] || STRINGS.en[k];
+const $ = (id) => document.getElementById(id);
+
+// Pairing key: from the QR link, remembered for the home-screen shortcut.
+const params = new URLSearchParams(location.search);
+let key = params.get("k") || "";
+try {
+  if (key) localStorage.setItem("maree-key", key);
+  else key = localStorage.getItem("maree-key") || "";
+} catch (e) { /* private mode */ }
+
+let mode = "question";
+let info = { problems: [] };
+let online = null;
+const entries = []; // {id, kind, problem, label, thumb, state, progress, blob}
+
+// ---------------------------------------------------------------- queue storage
+// Photos waiting to be sent survive a reload (e.g. after leaving the Wi-Fi).
+let dbp = null;
+function openDb() {
+  if (!dbp) dbp = new Promise((res) => {
+    try {
+      const r = indexedDB.open("maree-phone", 1);
+      r.onupgradeneeded = () => r.result.createObjectStore("queue", { keyPath: "id" });
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => res(null);
+    } catch (e) { res(null); }
+  });
+  return dbp;
+}
+async function store(op, value) {
+  const db = await openDb();
+  if (!db) return op === "all" ? [] : undefined;
+  return new Promise((res) => {
+    const tx = db.transaction("queue", op === "all" ? "readonly" : "readwrite");
+    const os = tx.objectStore("queue");
+    const r = op === "put" ? os.put(value) : op === "del" ? os.delete(value) : os.getAll();
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => res(op === "all" ? [] : undefined);
+  });
+}
+
+// ---------------------------------------------------------------- UI
+function applyText() {
+  document.documentElement.lang = lang === "en" ? "en" : lang;
+  $("modeQ").textContent = T("question");
+  $("modeA").textContent = T("answer");
+  $("shootText").textContent = T("shoot");
+  $("pickText").textContent = T("pick");
+  $("hint").textContent = T("hint");
+  $("targetLabel").textContent = T("target");
+  $("sentTitle").textContent = T("sent");
+  $("empty").textContent = T("none");
+  renderConn();
+  renderTargets();
+  renderList();
+}
+function renderConn() {
+  const c = $("conn");
+  c.className = "conn" + (online === true ? " on" : online === false ? " off" : "");
+  $("connText").textContent = online === true ? (info.desktop ? T("connected") + " · " + info.desktop : T("connected")) : online === false ? T("offline") : T("checking");
+}
+function renderTargets() {
+  const sel = $("target");
+  const keep = sel.value;
+  sel.textContent = "";
+  const none = document.createElement("option");
+  none.value = "";
+  none.textContent = T("decide");
+  sel.appendChild(none);
+  const groups = new Map();
+  for (const p of info.problems || []) {
+    const g = p.group || "";
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(p);
+  }
+  for (const [g, list] of groups) {
+    const parent = g ? document.createElement("optgroup") : sel;
+    if (g) { parent.label = g; sel.appendChild(parent); }
+    for (const p of list) {
+      const o = document.createElement("option");
+      o.value = p.id;
+      o.textContent = p.label;
+      parent.appendChild(o);
+    }
+  }
+  sel.value = [...sel.options].some((o) => o.value === keep) ? keep : "";
+}
+function setMode(m) {
+  mode = m;
+  for (const b of [$("modeQ"), $("modeA")]) {
+    const on = b.dataset.mode === m;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-checked", String(on));
+  }
+  $("targetWrap").classList.toggle("hidden", m !== "answer");
+}
+function stateText(e) {
+  if (e.state === "sending") return T("sending") + (e.progress ? " " + Math.round(e.progress * 100) + "%" : "…");
+  if (e.state === "done") return T("done");
+  if (e.state === "failed") return e.error ? T(e.error) : T("failed");
+  return T("waiting");
+}
+function renderList() {
+  const ul = $("list");
+  ul.textContent = "";
+  $("empty").classList.toggle("hidden", entries.length > 0);
+  for (const e of entries.slice().reverse()) {
+    const li = document.createElement("li");
+    const img = document.createElement("img");
+    img.src = e.thumb;
+    img.alt = "";
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    const what = document.createElement("div");
+    what.className = "what";
+    what.textContent = e.kind === "answer" ? T("answer") + (e.label ? " · " + e.label : "") : T("question");
+    const st = document.createElement("div");
+    st.className = "state" + (e.state === "done" ? " ok" : e.state === "failed" ? " err" : "");
+    st.textContent = stateText(e);
+    meta.append(what, st);
+    if (e.state === "sending") {
+      const bar = document.createElement("div");
+      bar.className = "bar";
+      const i = document.createElement("i");
+      i.style.width = Math.round((e.progress || 0) * 100) + "%";
+      bar.appendChild(i);
+      meta.appendChild(bar);
+    }
+    li.append(img, meta);
+    if (e.state === "failed" && !e.error) {
+      const b = document.createElement("button");
+      b.textContent = T("retry");
+      b.onclick = () => { e.state = "waiting"; renderList(); pump(); };
+      li.appendChild(b);
+    }
+    ul.appendChild(li);
+  }
+}
+function showPairing(text) {
+  $("pair").textContent = text;
+  $("pair").classList.remove("hidden");
+  $("main").classList.add("hidden");
+}
+
+// ---------------------------------------------------------------- network
+async function refreshInfo() {
+  if (!key) { showPairing(T("pair")); return; }
+  try {
+    const r = await fetch("/api/info", { headers: { "x-maree-key": key }, cache: "no-store" });
+    if (r.status === 401) { online = true; showPairing(T("expired")); renderConn(); return; }
+    info = await r.json();
+    online = true;
+    const next = pickLang(info.locale);
+    if (next !== lang) { lang = next; applyText(); }
+    renderTargets();
+  } catch (e) {
+    online = false;
+  }
+  renderConn();
+}
+
+function upload(e) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open("POST", "/api/upload");
+    x.setRequestHeader("x-maree-key", key);
+    x.setRequestHeader("x-kind", e.kind);
+    x.setRequestHeader("x-problem", e.problem || "");
+    x.setRequestHeader("x-name", encodeURIComponent(e.name || "photo.jpg"));
+    x.timeout = 180000;
+    x.upload.onprogress = (ev) => {
+      if (ev.lengthComputable) { e.progress = ev.loaded / ev.total; renderList(); }
+    };
+    x.onload = () => {
+      if (x.status === 200) resolve();
+      else reject(new Error(x.status === 413 ? "toobig" : x.status === 415 ? "unsupported" : x.status === 401 ? "auth" : "net"));
+    };
+    x.onerror = () => reject(new Error("net"));
+    x.ontimeout = () => reject(new Error("net"));
+    x.send(e.blob);
+  });
+}
+
+let pumping = false;
+async function pump() {
+  if (pumping) return;
+  pumping = true;
+  try {
+    for (;;) {
+      const e = entries.find((x) => x.state === "waiting");
+      if (!e) break;
+      e.state = "sending";
+      e.progress = 0;
+      renderList();
+      try {
+        await upload(e);
+        e.state = "done";
+        e.blob = null;
+        await store("del", e.id);
+        online = true;
+      } catch (err) {
+        e.state = "failed";
+        const m = String(err && err.message);
+        if (m === "toobig" || m === "unsupported") { e.error = m; await store("del", e.id); }
+        if (m === "auth") showPairing(T("expired"));
+        if (m === "net") { online = false; renderConn(); renderList(); break; }
+      }
+      renderList();
+      renderConn();
+    }
+  } finally {
+    pumping = false;
+  }
+}
+
+// ---------------------------------------------------------------- photos
+function loadImage(file) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => res({ img, url });
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error("decode")); };
+    img.src = url;
+  });
+}
+function toBlob(canvas, type, q) {
+  return new Promise((res) => canvas.toBlob(res, type, q));
+}
+// Re-encodes as JPEG (this also converts HEIC) and limits the size for a quick upload;
+// 2600 px on the long side keeps handwriting and small print legible.
+async function prepare(file) {
+  const { img, url } = await loadImage(file);
+  try {
+    let w = img.naturalWidth, h = img.naturalHeight;
+    const s = Math.min(1, 2600 / Math.max(w, h));
+    w = Math.round(w * s); h = Math.round(h * s);
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    c.getContext("2d").drawImage(img, 0, 0, w, h);
+    const blob = await toBlob(c, "image/jpeg", 0.86);
+    const t = document.createElement("canvas");
+    const ts = 120 / Math.max(w, h);
+    t.width = Math.max(1, Math.round(w * ts)); t.height = Math.max(1, Math.round(h * ts));
+    t.getContext("2d").drawImage(c, 0, 0, t.width, t.height);
+    return { blob, thumb: t.toDataURL("image/jpeg", 0.7) };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+async function addFiles(files) {
+  const target = mode === "answer" ? $("target").value : "";
+  const label = target ? ($("target").selectedOptions[0] || {}).textContent || "" : "";
+  for (const f of files) {
+    let prepared;
+    try { prepared = await prepare(f); } catch (e) { prepared = { blob: f, thumb: "" }; }
+    const e = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+      kind: mode, problem: target, label, name: f.name || "photo.jpg",
+      thumb: prepared.thumb, blob: prepared.blob, state: "waiting", progress: 0, created: Date.now()
+    };
+    entries.push(e);
+    await store("put", { id: e.id, kind: e.kind, problem: e.problem, label: e.label, name: e.name, thumb: e.thumb, blob: e.blob, created: e.created });
+    renderList();
+  }
+  pump();
+}
+
+$("modeQ").onclick = () => setMode("question");
+$("modeA").onclick = () => setMode("answer");
+$("shoot").onclick = () => $("camera").click();
+$("pick").onclick = () => $("library").click();
+for (const id of ["camera", "library"]) {
+  $(id).onchange = (ev) => {
+    const files = [...ev.target.files];
+    ev.target.value = "";
+    if (files.length) addFiles(files);
+  };
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") refreshInfo().then(() => {
+    for (const e of entries) if (e.state === "failed" && !e.error) e.state = "waiting";
+    pump();
+  });
+});
+window.addEventListener("online", () => pump());
+
+(async function init() {
+  applyText();
+  for (const q of (await store("all")) || []) {
+    entries.push({ ...q, state: "waiting", progress: 0 });
+  }
+  entries.sort((a, b) => a.created - b.created);
+  renderList();
+  await refreshInfo();
+  pump();
+  setInterval(refreshInfo, 30000);
+})();
+</script>
+</body>
+</html>
