@@ -508,6 +508,7 @@ for (const id of ["camera", "library"]) {
 }
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") refreshInfo().then(() => {
+    if (!updateVersion) checkUpdate();
     for (const e of entries) if (e.state === "failed" && !e.error) e.state = "waiting";
     pump();
   });
@@ -518,15 +519,18 @@ window.addEventListener("online", () => pump());
 let updateVersion = "";
 async function checkUpdate() {
   if (!NATIVE || !NATIVE.checkUpdate) return;
+  // Only a successful "nothing new" pauses checking; failures (no internet) retry next time.
   try {
     const last = Number(localStorage.getItem("maree-update-check") || 0);
-    if (Date.now() - last < 6 * 3600 * 1000 && !updateVersion) return;
-    localStorage.setItem("maree-update-check", String(Date.now()));
+    if (Date.now() - last < 6 * 3600 * 1000) return;
   } catch (e) { /* storage unavailable: check anyway */ }
   const r = await nativeCall("checkUpdate", []);
   if (r.status !== 200) return;
   const u = JSON.parse(r.body);
-  if (!u.available) return;
+  if (!u.available) {
+    try { localStorage.setItem("maree-update-check", String(Date.now())); } catch (e) { /* ignore */ }
+    return;
+  }
   updateVersion = u.versionName;
   $("updateText").textContent = T("updateAvailable").replace("{v}", updateVersion);
   $("updateBtn").textContent = T("updateNow");
