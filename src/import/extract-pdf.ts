@@ -6,7 +6,7 @@
 
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import type { ImportFlag } from "../data/types";
-import { assistedLatex, garbledRatio, hasMathUnicode, normalizeExtracted } from "../math/unicode";
+import { assistedLatex, garbledRatio, hasMathUnicode, hasTexControlDelimiters, normalizeExtracted } from "../math/unicode";
 import type { ExtractedDocument, ExtractedLine } from "./types";
 
 export interface PdfjsLike {
@@ -234,7 +234,9 @@ export async function extractPdf(
     }
     for (const e of edge) edgeCounts.set(e, (edgeCounts.get(e) ?? 0) + 1);
   });
-  const repeated = new Set([...edgeCounts].filter(([, n]) => n >= Math.max(3, perPage.length * 0.5)).map(([t]) => t));
+  // A line at the top or bottom edge that recurs on at least half the pages (and on at
+  // least two) is a running header or footer.
+  const repeated = new Set([...edgeCounts].filter(([, n]) => n >= Math.max(2, perPage.length * 0.5)).map(([t]) => t));
 
   for (const { page, lines, height } of perPage) {
     const kept = lines.filter((l) => {
@@ -271,6 +273,8 @@ export async function extractPdf(
       if (hasMathUnicode(plain)) flags.push({ code: "math-unicode", message: "Contains mathematical symbols extracted as Unicode text." });
       if (scripts) flags.push({ code: "lost-scripts", message: "Raised or lowered characters (exponents, indices) were detected; they appear inline in the extracted text." });
       if (garbledRatio(plain) > 0.02) flags.push({ code: "garbled", message: "Some characters could not be decoded from the PDF font." });
+      if (hasTexControlDelimiters(l.items.map((x) => x.str).join("")))
+        flags.push({ code: "garbled", message: "Large brackets drawn from a TeX extension font were decoded heuristically." });
       const heading = l.size >= body * 1.6 ? 1 : l.size >= body * 1.35 ? 2 : l.size >= body * 1.18 ? 3 : undefined;
       const indent = Math.max(0, Math.round((l.minX - margin) / (body * 1.2)));
       const prev = out[out.length - 1];

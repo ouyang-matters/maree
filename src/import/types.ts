@@ -70,13 +70,16 @@ export interface SegmentedProblem {
   lecture: { number: string; title: string } | null;
   section: string;
   confidence: "high" | "medium" | "low";
+  /** Difficulty and priority printed in the document ("L3", "CORE"), if any. */
+  difficulty?: number | null;
+  priority?: number;
 }
 
 export interface Segmentation {
   style: "structured" | "keyword" | "numbered" | "headings" | "single";
   preamble: ExtractedLine[];
   problems: SegmentedProblem[];
-  lectures: { number: string; title: string; page: number | null }[];
+  lectures: { number: string; title: string; detail?: string; page: number | null }[];
 }
 
 export interface CandidatePart {
@@ -120,6 +123,8 @@ export interface Candidate {
   suggestedTopicNames: string[];
   category: Category | null;
   difficulty: number | null;
+  /** 0 none · 1 low · 2 medium · 3 high (e.g. from a "CORE" mark in the source). */
+  priority: number;
   duplicateOf: { id: string; label: string; similarity: number } | null;
   /** Attachment images to store with the problem (image imports). */
   images?: { name: string; bytes: Uint8Array; mime: string }[];

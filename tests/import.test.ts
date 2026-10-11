@@ -10,7 +10,7 @@ import { extractProblemSetJson } from "../src/import/extract-json";
 import { detectCourseCodes, parseLectureNumbers, suggestCategory, suggestTopics } from "../src/import/classify";
 import { DuplicateIndex } from "../src/import/duplicates";
 import { commitPlans, extractDocument, planDocument, sha256Hex, type LibraryContext } from "../src/import/pipeline";
-import { assistedLatex, normalizeExtracted } from "../src/math/unicode";
+import { assistedLatex, hasTexControlDelimiters, normalizeExtracted } from "../src/math/unicode";
 import { freshRepo } from "./helpers/node-driver";
 import type { Topic } from "../src/data/types";
 
@@ -228,6 +228,14 @@ describe("duplicates", () => {
 });
 
 describe("unicode handling", () => {
+  it("decodes TeX extension-font delimiters and drops variation selectors", () => {
+    // Fonts without a Unicode map give large brackets as control characters at their cmex positions.
+    const raw = String.fromCharCode(0x12) + "1 + 1/n" + String.fromCharCode(0x13) + "n, " + "√" + String.fromCharCode(0xfe01) + "2";
+    expect(normalizeExtracted(raw)).toBe("(1 + 1/n)n, √2");
+    expect(hasTexControlDelimiters(raw)).toBe(true);
+    expect(hasTexControlDelimiters("plain (text)")).toBe(false);
+  });
+
   it("normalises ligatures and math alphanumerics losslessly", () => {
     expect(normalizeExtracted("ﬁnite 𝑥 𝑛")).toBe("finite x n");
   });
@@ -315,5 +323,36 @@ describe("import commit", () => {
     expect(again.skip).toBe(true);
     expect(again.existingSources).toHaveLength(1);
     expect(again.candidates.every((c) => c.duplicateOf && !c.include)).toBe(true);
+  });
+});
+
+describe("review sheets with level tags (PDF)", () => {
+  it("reads lecture labels with titles on the next line, question titles, levels and CORE", async () => {
+    const bytes = new Uint8Array(readFileSync(join(__dirname, "fixtures", "levels-problem-set.pdf")));
+    const doc = await extractDocument("MATH147_Midterm_Review.pdf", bytes, { loadPdfjs: async () => lib });
+    const plan = planDocument({ fileName: doc.fileName, hash: null, size: bytes.length, doc }, { courses: [], lectures: [], topics: [], existing: [] });
+    expect(plan.candidates.map((c) => c.number)).toEqual(["1", "2", "3", "4", "5", "6"]);
+    expect(plan.lectureMap.map((m) => [m.ref, m.title, m.description, m.count])).toEqual([
+      ["7", "Convergence & Divergence", "Notes pp. 27–30", 3],
+      ["8", "Algebra of Limits", "Notes pp. 31–32", 3],
+    ]);
+    const c = Object.fromEntries(plan.candidates.map((x) => [x.number, x]));
+    expect(c["1"].title).toBe("Uniqueness Lemma");
+    expect(c["3"].title).toBe("A Non-Cauchy Sequence");
+    expect(c["5"].title).toBe("Euler’s Number");
+    expect(plan.candidates.map((x) => x.difficulty)).toEqual([1, 2, 2, 1, 3, 4]);
+    expect(plan.candidates.map((x) => x.priority)).toEqual([0, 3, 0, 0, 0, 3]);
+    // Headings, running header/footer and the next lecture never leak into statements.
+    expect(c["1"].statement.startsWith("Let a, b")).toBe(true);
+    for (const x of plan.candidates) expect(x.statement).not.toMatch(/LECTURE|NO SOLUTIONS|MIDTERM|Algebra of Limits$/);
+    expect(c["4"].section).toBe("Lecture 8 — Algebra of Limits (notes pp. 31–32)");
+    expect(c["5"].statement).toContain("(1 + ");
+  });
+
+  it("only reads L1–L4 as levels when the document defines them", async () => {
+    const { parseTrailingTags } = await import("../src/import/segment");
+    expect(parseTrailingTags("Squeeze Theorem L2 CORE", true)).toEqual({ rest: "Squeeze Theorem", difficulty: 2, priority: 3 });
+    expect(parseTrailingTags("Squeeze Theorem L2", false)).toEqual({ rest: "Squeeze Theorem L2", difficulty: null, priority: 0 });
+    expect(parseTrailingTags("Squeeze Theorem Level 3", false)).toEqual({ rest: "Squeeze Theorem", difficulty: 3, priority: 0 });
   });
 });

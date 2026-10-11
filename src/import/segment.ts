@@ -45,15 +45,85 @@ export function matchPart(text: string): { label: string; rest: string } | null 
   return { label, rest };
 }
 
-function isLectureHeading(line: ExtractedLine): { number: string; title: string } | null {
+/** "LECTURE 7    NOTES PP. 27–30": a lecture label followed by detail rather than a title. */
+const LECTURE_LOOSE_RE = /^\s*(?:#{1,6}\s*)?(?:\*\*|__)?\s*(Lecture|Lec\.|Week|Chapter|Section|Unit|Tutorial)\s+(\d+[A-Za-z]?(?:\.\d+)*)\b\s*(.*?)\s*(?:\*\*|__)?\s*$/i;
+
+interface LectureHeading {
+  number: string;
+  title: string;
+  /** Extra text on the heading line, e.g. "Notes pp. 27–30". */
+  detail: string;
+  /** Index of a following line that holds the title, if any. */
+  titleLine: number | null;
+}
+
+function looksLikeTitle(text: string): boolean {
+  const t = text.trim().replace(/^[#*\s]+|[*\s]+$/g, "");
+  if (!t || t.length > 80 || t.split(/\s+/).length > 9) return false;
+  if (/[.;:?]$/.test(t) || /[=<>∈≤≥]|\\\(|\$/.test(t)) return false;
+  return /^\p{Lu}/u.test(t) && !KEYWORD_RE.test(t);
+}
+
+function isLectureHeading(lines: ExtractedLine[], i: number): LectureHeading | null {
+  const line = lines[i];
   const text = line.text.trim();
   if (text.length > 120) return null;
   const m = LECTURE_RE.exec(text);
-  if (!m) return null;
-  const title = (m[3] ?? "").replace(/[*_]+$/g, "").trim();
-  // A long sentence that merely starts with "Lecture 9 …" is prose, not a heading.
-  if (!line.heading && /[.;]$/.test(title) && title.split(/\s+/).length > 8) return null;
-  return { number: m[2], title };
+  if (m) {
+    const title = (m[3] ?? "").replace(/[*_]+$/g, "").trim();
+    // A long sentence that merely starts with "Lecture 9 …" is prose, not a heading.
+    if (!line.heading && /[.;]$/.test(title) && title.split(/\s+/).length > 8) return null;
+    if (title) return { number: m[2], title, detail: "", titleLine: null };
+  }
+  const loose = m ? null : LECTURE_LOOSE_RE.exec(text);
+  if (!m && !loose) return null;
+  const number = (m ?? loose)![2];
+  const detail = loose ? loose[3].replace(/[*_]+$/g, "").trim() : "";
+  // Only headings, upper-case labels ("LECTURE 7") or short detail count; prose does not.
+  if (loose && !line.heading && !/^[\s#*_]*[A-Z]{3,}/.test(text)) return null;
+  if (detail.split(/\s+/).length > 6) return null;
+  // The title may sit on the next non-empty line, set as a heading.
+  let titleLine: number | null = null;
+  for (let j = i + 1; j < Math.min(lines.length, i + 4); j++) {
+    if (!lines[j].text.trim()) continue;
+    if ((lines[j].heading || !line.heading) && looksLikeTitle(lines[j].text)) titleLine = j;
+    break;
+  }
+  const title = titleLine !== null ? lines[titleLine].text.replace(/^[#*\s]+|[*\s]+$/g, "").trim() : "";
+  return { number, title, detail, titleLine };
+}
+
+const SENTENCE_START =
+  /^(Prove|Show|Let|Suppose|Compute|Calculate|Find|Determine|Evaluate|Give|Use|Using|Define|Consider|Is|Are|Does|Do|For|If|Assume|Explain|Describe|State|Write|Verify|Deduce|Solve|Simplify|Sketch|In|We|Our|This|Then|Recall|Note)\b/;
+
+/** "A Non-Cauchy Sequence" is a title; "A bounded sequence converges" is a sentence. */
+function isTitleCase(text: string): boolean {
+  const words = text.split(/\s+/).filter((w) => w.length > 3);
+  if (!words.length) return true;
+  return words.filter((w) => /^\p{Lu}/u.test(w)).length / words.length >= 0.6;
+}
+
+/** Levels ("L1"…"L4", "Level 3") and priority marks ("CORE", "★") printed after a problem heading. */
+export function parseTrailingTags(rest: string, levelsDefined: boolean): { rest: string; difficulty: number | null; priority: number } {
+  let r = rest;
+  let difficulty: number | null = null;
+  let priority = 0;
+  for (let guard = 0; guard < 4; guard++) {
+    const core = /\s*(?:\bCORE\b|\(core\)|★+)\s*$/i.exec(r);
+    if (core && r.length > core[0].length) {
+      priority = 3;
+      r = r.slice(0, core.index);
+      continue;
+    }
+    const lvl = /\s*\b(?:Level\s*([1-4])|\[?L([1-4])\]?)\s*$/i.exec(r);
+    if (lvl && (lvl[1] || levelsDefined) && r.length > lvl[0].length) {
+      difficulty = Number(lvl[1] ?? lvl[2]);
+      r = r.slice(0, lvl.index);
+      continue;
+    }
+    break;
+  }
+  return { rest: r.trim(), difficulty, priority };
 }
 
 function lectureKindOf(text: string): string {
@@ -65,9 +135,11 @@ interface Marker {
   number: string;
   title: string;
   rest: string;
+  difficulty?: number | null;
+  priority?: number;
 }
 
-function keywordMarkers(lines: ExtractedLine[]): Marker[] {
+function keywordMarkers(lines: ExtractedLine[], levelsDefined: boolean): Marker[] {
   const out: Marker[] = [];
   lines.forEach((l, index) => {
     if ((l.indent ?? 0) > 2) return;
@@ -75,7 +147,16 @@ function keywordMarkers(lines: ExtractedLine[]): Marker[] {
     if (!m) return;
     // "Q" alone is accepted only with punctuation or a number directly attached ("Q3.").
     if (/^q$/i.test(m[1]) && !/^\s*(?:\*\*)?Q\d/i.test(l.text)) return;
-    out.push({ index, number: m[2], title: (m[3] ?? "").trim(), rest: m[4] ?? "" });
+    const tags = parseTrailingTags(m[4] ?? "", levelsDefined);
+    let title = (m[3] ?? "").trim();
+    let rest = tags.rest;
+    // "Q1. Uniqueness Lemma" with the statement on the following lines: the rest is a title.
+    const next = lines.slice(index + 1, index + 3).find((x) => x.text.trim());
+    if (!title && rest && next && !KEYWORD_RE.test(next.text) && looksLikeTitle(rest) && !SENTENCE_START.test(rest) && (!/^(A|An|The)\b/.test(rest) || isTitleCase(rest))) {
+      title = rest.replace(/^[*_]+|[*_]+$/g, "").trim();
+      rest = "";
+    }
+    out.push({ index, number: m[2], title, rest, difficulty: tags.difficulty, priority: tags.priority });
   });
   return out;
 }
@@ -97,7 +178,7 @@ function numberedMarkers(lines: ExtractedLine[]): Marker[] {
       n = parseInt(m[1], 10);
       rest = m[2];
     }
-    const lecture = index > 0 && lines.slice(Math.max(0, index - 3), index).some((x) => isLectureHeading(x));
+    const lecture = index > 0 && lines.slice(Math.max(0, index - 3), index).some((_x, k) => isLectureHeading(lines, Math.max(0, index - 3) + k));
     if (n === expected || (n === 1 && lecture)) {
       out.push({ index, number: String(n), title: "", rest });
       expected = n + 1;
@@ -153,21 +234,26 @@ function trimBlank(lines: ExtractedLine[]): ExtractedLine[] {
 
 export function segment(input: ExtractedLine[]): Segmentation {
   const lectures: Segmentation["lectures"] = [];
-  const lectureAt = new Map<number, { number: string; title: string }>();
+  const lectureAt = new Map<number, LectureHeading>();
   const sectionAt = new Map<number, string>();
+  const titleLines = new Set<number>();
   input.forEach((l, i) => {
-    const lec = isLectureHeading(l);
+    if (titleLines.has(i)) return;
+    const lec = isLectureHeading(input, i);
     if (lec) {
-      const kind = lectureKindOf(l.text);
+      const kind = lectureKindOf(l.text) || (LECTURE_LOOSE_RE.exec(l.text.trim())?.[1] ?? "").toLowerCase();
+      if (lec.titleLine !== null) titleLines.add(lec.titleLine);
       if (kind === "section" || kind === "chapter") sectionAt.set(i, l.text.replace(/^[#*\s]+|[*\s]+$/g, ""));
       else {
         lectureAt.set(i, lec);
-        lectures.push({ ...lec, page: l.page ?? null });
+        lectures.push({ number: lec.number, title: lec.title, detail: lec.detail, page: l.page ?? null });
       }
     } else if (l.heading && !KEYWORD_RE.test(l.text)) {
       sectionAt.set(i, l.text.replace(/^[#*\s]+|[*\s]+$/g, ""));
     }
   });
+  // "L1 = basics, …" in the document defines L1–L4 as difficulty levels.
+  const levelsDefined = input.some((l) => /\bL1\s*=\s*\w|\blevel\s*1\b/i.test(l.text));
 
   // ---- choose a strategy
   const structured = input.some((l) => l.marker?.kind === "problem");
@@ -183,7 +269,7 @@ export function segment(input: ExtractedLine[]): Segmentation {
       }
     });
   } else {
-    const kw = keywordMarkers(input);
+    const kw = keywordMarkers(input, levelsDefined);
     const nb = numberedMarkers(input);
     if (kw.length >= 1) {
       style = "keyword";
@@ -224,8 +310,9 @@ export function segment(input: ExtractedLine[]): Segmentation {
   const advanceContext = (upTo: number) => {
     for (; scan <= upTo && scan < input.length; scan++) {
       if (lectureAt.has(scan)) {
-        currentLecture = lectureAt.get(scan)!;
-        currentSection = input[scan].text.replace(/^[#*\s]+|[*\s]+$/g, "");
+        const lec = lectureAt.get(scan)!;
+        currentLecture = { number: lec.number, title: lec.title };
+        currentSection = `Lecture ${lec.number}${lec.title ? ` — ${lec.title}` : ""}${lec.detail ? ` (${lec.detail.replace(/\bPP\.\s*/i, "pp. ").replace(/^NOTES\b/i, "notes")})` : ""}`;
       } else if (sectionAt.has(scan)) currentSection = sectionAt.get(scan)!;
     }
   };
@@ -255,6 +342,13 @@ export function segment(input: ExtractedLine[]): Segmentation {
         marker: undefined,
       });
     }
+    // Lines that hold a lecture title belong to the heading, not to the previous problem.
+    for (let j = mk.index + 1; j < end; j++) {
+      if (titleLines.has(j)) {
+        end = j;
+        break;
+      }
+    }
     for (let j = mk.index + 1; j < end; j++) {
       const l = input[j];
       if (l.role === "solution") solution.push(l);
@@ -273,6 +367,8 @@ export function segment(input: ExtractedLine[]): Segmentation {
       lecture: currentLecture,
       section: currentSection,
       confidence,
+      difficulty: mk.difficulty ?? null,
+      priority: mk.priority ?? 0,
     });
   });
 

@@ -1,0 +1,44 @@
+% Test fixture: a review sheet in the "Q-heading + level tag" style.
+% Running header/footer, "LECTURE n" label with notes pages and the title on the next line,
+% bold question headings with right-aligned level tags (L1–L4) and a CORE priority mark.
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small MATH 147 / MIDTERM PROOF PRACTICE}
+\rhead{\small LECTURES 7--8}
+\lfoot{\small 6 PROBLEMS $\bullet$ NO SOLUTIONS}
+\rfoot{\small\thepage}
+\setlength{\parindent}{0pt}
+\newcommand{\lecture}[3]{\vspace{10pt}{\small LECTURE #1 \hfill NOTES PP. #2}\par\vspace{4pt}{\Large\bfseries #3}\par\vspace{10pt}}
+\newcommand{\q}[3]{\par\vspace{8pt}\textbf{Q#1. #2}\hfill{\small #3}\par}
+\begin{document}
+{\Large\bfseries Progressive Proof Practice}\par
+MATH 147 $|$ Lectures 7--8\par\medskip
+Questions arranged by lecture. L1 = basics, L2 = standard theorem, L3 = application, L4 = challenge. CORE marks priority questions.
+
+\lecture{7}{27--30}{Convergence \& Divergence}
+\q{1}{Uniqueness Lemma}{L1}
+Let $a, b \in \mathbb{R}$. Prove that if $|a - b| < \varepsilon$ for every $\varepsilon > 0$, then $a = b$.
+\q{2}{Uniqueness of Limits}{L2 \quad CORE}
+Prove that a sequence of real numbers has at most one limit.
+\q{3}{A Non-Cauchy Sequence}{L2}
+Prove directly from the definition that
+\[ x_n = 1 + (-1)^n \]
+is not Cauchy.
+\newpage
+\lecture{8}{31--32}{Algebra of Limits}
+\q{4}{Direct Limit Proof}{L1}
+Prove directly from the definition that
+\[ \lim_{n\to\infty} \frac{4n+3}{n+1} = 4. \]
+\q{5}{Euler's Number}{L3}
+Let
+\[ a_n = \left(1 + \frac{1}{n}\right)^n. \]
+Prove that $\{a_n\}$ is increasing and bounded above by 3.
+\q{6}{Infinite Limit Application}{L4 \quad CORE}
+Let $x_n = n^2/(1-n)$ for $n \geq 2$. Prove directly that $x_n \to -\infty$.
+\end{document}

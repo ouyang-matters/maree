@@ -18,6 +18,8 @@ use tauri::{Manager, State};
 const AUTO_SNAPSHOTS_KEPT: usize = 10;
 /// Minimum interval between automatic snapshots taken at startup.
 const AUTO_SNAPSHOT_INTERVAL_SECS: u64 = 20 * 60 * 60;
+/// How long the UI gets to save and close the window after a close request.
+const CLOSE_WATCHDOG_SECS: u64 = 6;
 
 pub struct Paths {
     pub data_dir: PathBuf,
@@ -332,6 +334,17 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .on_window_event(|window, event| {
+            // The UI saves pending edits and then closes the window itself. If the web view
+            // does not answer (e.g. it is stalled), close anyway so the app never refuses to quit.
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                let w = window.clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_secs(CLOSE_WATCHDOG_SECS));
+                    let _ = w.destroy();
+                });
+            }
+        })
         .setup(|app| {
             let paths = resolve_paths(app.handle())?;
             fs::create_dir_all(&paths.data_dir)?;

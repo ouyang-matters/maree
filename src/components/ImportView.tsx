@@ -18,7 +18,7 @@ import {
 import { useStore, get } from "../state/store";
 import * as A from "../state/actions";
 import { SOURCE_KINDS, type Category, type SourceKind } from "../data/types";
-import { CATEGORY_LABEL, DIFFICULTY_LABEL } from "../domain/status";
+import { CATEGORY_LABEL, DIFFICULTY_LABEL, PRIORITY_LABEL } from "../domain/status";
 import { courseLabel, lectureLabel } from "../domain/filters";
 import { withVariant, type DocPlan } from "../import/pipeline";
 import type { Candidate } from "../import/types";
@@ -457,6 +457,13 @@ function CandidateEditor({
               {[1, 2, 3, 4].map((d) => (
                 <option key={d} value={d}>
                   {d} — {t(DIFFICULTY_LABEL[d])}
+                </option>
+              ))}
+            </select>
+            <select className="select" value={c.priority} onChange={(e) => patch({ priority: Number(e.target.value) })}>
+              {[0, 1, 2, 3].map((n) => (
+                <option key={n} value={n}>
+                  {t("Priority: {p}", { p: t(PRIORITY_LABEL[n]) })}
                 </option>
               ))}
             </select>

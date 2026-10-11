@@ -69,9 +69,31 @@ export function normalizeExtracted(s: string): string {
     else if (ch === "\u00a0" || ch === "\u2009" || ch === "\u202f" || ch === "\u2002" || ch === "\u2003") out += " ";
     else if (ch === "\u00ad" || ch === "\u200b" || ch === "\ufeff") continue;
     else if (cp === 0x210e) out += "h"; // planck constant used as italic h
+    else if (cp >= 0xfe00 && cp <= 0xfe0f) continue; // variation selectors (e.g. alternate radical glyphs)
+    else if (TEX_EXTENSION_DELIMITERS[cp] !== undefined) out += TEX_EXTENSION_DELIMITERS[cp];
     else out += ch;
   }
   return out.replace(/\r\n?/g, "\n");
+}
+
+/**
+ * Large delimiters drawn from TeX's extension font (cmex) often reach PDF text as control
+ * characters at their font positions. Mapping them back is a heuristic, so callers flag it
+ * (see `hasTexControlDelimiters`). Tab, line feed and carriage return are left alone.
+ */
+const TEX_EXTENSION_DELIMITERS: Record<number, string> = {
+  0x00: "(", 0x01: ")", 0x02: "[", 0x03: "]", 0x04: "⌊", 0x05: "⌋", 0x06: "⌈", 0x07: "⌉",
+  0x08: "{", 0x0b: "⟩", 0x0c: "|", 0x0e: "/", 0x0f: "/",
+  0x10: "(", 0x11: ")", 0x12: "(", 0x13: ")", 0x14: "[", 0x15: "]", 0x16: "⌊", 0x17: "⌋",
+  0x18: "⌈", 0x19: "⌉", 0x1a: "{", 0x1b: "}", 0x1c: "⟨", 0x1d: "⟩", 0x1e: "/", 0x1f: "/",
+};
+
+export function hasTexControlDelimiters(s: string): boolean {
+  for (const ch of s) {
+    const cp = ch.codePointAt(0)!;
+    if (cp < 0x20 && TEX_EXTENSION_DELIMITERS[cp] !== undefined) return true;
+  }
+  return false;
 }
 
 const MATH_CHAR = /[Ͱ-Ͽ∀-⋿←-⇿⟀-⟯⦀-⧿⨀-⫿⁰-₟ℝℕℤℚℂℙℓℵ√∞±×÷·′″⟨⟩⌊⌋⌈⌉‖]/u;

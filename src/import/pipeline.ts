@@ -137,6 +137,8 @@ export interface LectureMapping {
   lectureId: string | null;
   create: boolean;
   count: number;
+  /** Extra detail from the heading (e.g. "Notes pp. 27–30"), stored as the lecture description. */
+  description: string;
 }
 
 export interface DocPlan {
@@ -161,6 +163,8 @@ export interface DocPlan {
   candidates: Candidate[];
   existingSources: Source[];
   newTopicNames: { name: string; accept: boolean; count: number }[];
+  /** Lecture headings found in the document. */
+  docLectures: { number: string; title: string; detail?: string }[];
   skip: boolean;
 }
 
@@ -213,6 +217,7 @@ export function planDocument(
   const drafts: Draft[] = [];
   let style = "structured";
   let preamble = "";
+  let docLectures: DocPlan["docLectures"] = [];
   const fileLectureRefs = parseLectureNumbers(prettyFileTitle(input.fileName)).map(String);
 
   if (doc.structured) {
@@ -249,6 +254,7 @@ export function planDocument(
         suggestedTopicNames: missing,
         category: sp.category ?? suggestCategory(sp.statement),
         difficulty: sp.difficulty ?? null,
+        priority: 0,
         duplicateOf: null,
       });
     }
@@ -281,11 +287,13 @@ export function planDocument(
       suggestedTopicNames: [],
       category: null,
       difficulty: null,
+      priority: 0,
       duplicateOf: null,
       images: doc.images,
     });
   } else {
     const seg = segment(doc.lines);
+    docLectures = seg.lectures.map((l) => ({ number: l.number, title: l.title, detail: l.detail }));
     style = seg.style;
     preamble = linesToText(seg.preamble);
     for (const sp of seg.problems) {
@@ -328,7 +336,8 @@ export function planDocument(
         topicIds: topics.hits.slice(0, 4).map((h) => h.topicId),
         suggestedTopicNames: topics.newNames,
         category: suggestCategory(whole),
-        difficulty: suggestDifficulty(linesToText(sp.raw)),
+        difficulty: sp.difficulty ?? suggestDifficulty(linesToText(sp.raw)),
+        priority: sp.priority ?? 0,
         duplicateOf: null,
       });
     }
@@ -362,6 +371,7 @@ export function planDocument(
           suggestedTopicNames: [],
           category: null,
           difficulty: null,
+          priority: 0,
           duplicateOf: null,
         });
       }
@@ -398,6 +408,7 @@ export function planDocument(
     sourceKind: doc.meta?.sourceKind ?? guessSourceKind(input.fileName, doc.title),
     sourceAuthor: doc.meta?.author ?? "",
     lectureMap: [],
+    docLectures,
     fileLectureRefs,
     candidates: drafts.map((d, i) => ({ ...d, key: `${key}:${i}` })),
     existingSources,
@@ -405,6 +416,13 @@ export function planDocument(
     skip: existingSources.length > 0,
   };
   return mapLectures(plan, plan.courseId, ctx);
+}
+
+/** "NOTES PP. 27–30" → "Notes pp. 27–30". */
+function prettyDetail(detail: string): string {
+  if (!detail) return "";
+  const lower = /[a-z]/.test(detail) ? detail : detail.toLowerCase();
+  return (lower.charAt(0).toUpperCase() + lower.slice(1)).replace(/\bpp\.\s*/i, "pp. ");
 }
 
 /** (Re)computes the lecture mapping after the course changes. */
@@ -428,7 +446,8 @@ export function mapLectures(plan: DocPlan, courseId: string | null, ctx: Pick<Li
     const prev = plan.lectureMap.find((m) => m.ref === ref);
     return {
       ref,
-      title: existing?.title || headingTitles.get(ref) || prev?.title || "",
+      title: existing?.title || plan.docLectures.find((d) => d.number === ref)?.title || headingTitles.get(ref) || prev?.title || "",
+      description: prettyDetail(plan.docLectures.find((d) => d.number === ref)?.detail ?? ""),
       lectureId: existing?.id ?? null,
       create: !existing && !!(courseId || plan.newCourse),
       count: v.count,
@@ -508,7 +527,7 @@ export async function commitPlans(plans: DocPlan[], deps: CommitDeps): Promise<C
     const toCreate = plan.lectureMap.filter((m) => !m.lectureId && m.create && courseId);
     if (toCreate.length) {
       const created = await repo.createLectures(
-        toCreate.map((m) => ({ courseId: courseId!, number: m.ref, title: m.title })),
+        toCreate.map((m) => ({ courseId: courseId!, number: m.ref, title: m.title, description: m.description })),
       );
       created.forEach((l, i) => lectureIdByRef.set(toCreate[i].ref, l.id));
       result.createdLectures += created.length;
@@ -577,6 +596,7 @@ export async function commitPlans(plans: DocPlan[], deps: CommitDeps): Promise<C
           sourceSection: c.section,
           sourceExcerpt: c.rawText || null,
           difficulty: c.difficulty,
+          priority: c.priority,
           category: c.category,
           referenceSolution: c.referenceSolution,
           notes: c.notes,
