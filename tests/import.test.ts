@@ -356,3 +356,27 @@ describe("review sheets with level tags (PDF)", () => {
     expect(parseTrailingTags("Squeeze Theorem Level 3", false)).toEqual({ rest: "Squeeze Theorem", difficulty: 3, priority: 0 });
   });
 });
+
+describe("decimal problem headings", () => {
+  it("splits '7.1 Title L1' problem sets by lecture, with levels as difficulty", () => {
+    const lines = [
+      "Levels: L1 direct, L2 standard application, L3 multi-step, L4 challenge.",
+      "Lecture 7 — Convergence, Boundedness & Divergence",
+      "7.1 Direct limit and global bound L1",
+      "Let an = 2n−1 n+3 . Prove directly from the definition that an → 2.",
+      "",
+      "7.2 Bounded but divergent L2",
+      "Let an = (−1)n(2 + 1n ). Show that {an} is bounded.",
+      "Lecture 8 — Infinite Limits & Algebra of Limits",
+      "8.1 Rational limit, direct proof L1",
+      "Prove directly, with an explicit Nε, that the limit is 5/3.",
+    ].map((text) => ({ text, page: 1, heading: text.startsWith("Lecture") ? 3 : undefined }));
+    const seg = segment(lines);
+    expect(seg.problems.map((p) => [p.number, p.title, p.difficulty, p.lecture?.number])).toEqual([
+      ["7.1", "Direct limit and global bound", 1, "7"],
+      ["7.2", "Bounded but divergent", 2, "7"],
+      ["8.1", "Rational limit, direct proof", 1, "8"],
+    ]);
+    expect(seg.problems[0].lines.map((l) => l.text).join(" ")).toContain("Prove directly from the definition");
+  });
+});

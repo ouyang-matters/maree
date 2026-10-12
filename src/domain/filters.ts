@@ -205,19 +205,34 @@ export function compareProblems(a: ProblemSummary, b: ProblemSummary, sort: Sort
   }
 }
 
-/** Default "library order": course, lecture, original number, then creation time. */
+/**
+ * Default "library order": course, lecture, source document (in the order they were
+ * imported, so two problem sets for one lecture stay apart), original number, creation time.
+ */
 export function libraryOrder(a: ProblemSummary, b: ProblemSummary, index: LibraryIndex): number {
-  const keys: SortSpec[] = [
+  const keys: (SortSpec | "source-order")[] = [
     { key: "course", dir: "asc" },
     { key: "lecture", dir: "asc" },
+    "source-order",
     { key: "number", dir: "asc" },
     { key: "created", dir: "asc" },
   ];
   for (const k of keys) {
-    const c = compareProblems(a, b, k, index);
+    const c = k === "source-order" ? sourceOrder(a, b, index) : compareProblems(a, b, k, index);
     if (c !== 0) return c;
   }
   return 0;
+}
+
+/** Problems from earlier-imported documents first; problems without a source last. */
+function sourceOrder(a: ProblemSummary, b: ProblemSummary, index: LibraryIndex): number {
+  const at = (p: ProblemSummary) => (p.sourceId ? index.sources.get(p.sourceId)?.importedAt : undefined) ?? null;
+  const x = at(a);
+  const y = at(b);
+  if (x === y) return 0;
+  if (x === null) return 1;
+  if (y === null) return -1;
+  return x.localeCompare(y);
 }
 
 export function sortProblems(

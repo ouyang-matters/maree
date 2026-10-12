@@ -161,6 +161,28 @@ function keywordMarkers(lines: ExtractedLine[], levelsDefined: boolean): Marker[
   return out;
 }
 
+const DECIMAL_RE = /^\s*(?:\*\*)?(\d{1,2})\.(\d{1,2})(?:\*\*)?\s+(?=\S)(.+?)\s*$/;
+
+/**
+ * "7.1 Direct limit and global bound L1": a short title line numbered within a lecture,
+ * with the statement on the following lines. Requires a title, not a sentence.
+ */
+function decimalMarkers(lines: ExtractedLine[], levelsDefined: boolean): Marker[] {
+  const out: Marker[] = [];
+  lines.forEach((l, index) => {
+    if ((l.indent ?? 0) > 2) return;
+    const m = DECIMAL_RE.exec(l.text);
+    if (!m) return;
+    const tags = parseTrailingTags(m[3], levelsDefined);
+    const title = tags.rest.replace(/^[*_]+|[*_]+$/g, "").trim();
+    if (!title || title.length > 90 || /[.:;?]$/.test(title) || SENTENCE_START.test(title)) return;
+    const next = lines.slice(index + 1, index + 3).find((x) => x.text.trim());
+    if (!next || DECIMAL_RE.test(next.text)) return;
+    out.push({ index, number: `${m[1]}.${m[2]}`, title, rest: "", difficulty: tags.difficulty, priority: tags.priority });
+  });
+  return out;
+}
+
 function numberedMarkers(lines: ExtractedLine[]): Marker[] {
   const out: Marker[] = [];
   let expected = 1;
@@ -253,7 +275,7 @@ export function segment(input: ExtractedLine[]): Segmentation {
     }
   });
   // "L1 = basics, …" in the document defines L1–L4 as difficulty levels.
-  const levelsDefined = input.some((l) => /\bL1\s*=\s*\w|\blevel\s*1\b/i.test(l.text));
+  const levelsDefined = input.some((l) => /\bL1\s*=\s*\w|\blevel\s*1\b|\blevels?\s*:\s*(?:\*\*)?L1\b/i.test(l.text));
 
   // ---- choose a strategy
   const structured = input.some((l) => l.marker?.kind === "problem");
@@ -270,11 +292,16 @@ export function segment(input: ExtractedLine[]): Segmentation {
     });
   } else {
     const kw = keywordMarkers(input, levelsDefined);
+    const dec = decimalMarkers(input, levelsDefined);
     const nb = numberedMarkers(input);
     if (kw.length >= 1) {
       style = "keyword";
       confidence = "high";
       markers = kw;
+    } else if (dec.length >= 2) {
+      style = "numbered";
+      confidence = "high";
+      markers = dec;
     } else if (nb.length >= 2) {
       style = "numbered";
       confidence = "medium";

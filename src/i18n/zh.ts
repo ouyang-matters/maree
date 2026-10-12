@@ -174,4 +174,6 @@ export const zh: Record<string, string> = {
   "This image has no editable strokes; you can write over a blank page instead.": "这张图片没有可编辑的笔迹；你可以在空白页上重新书写。",
   "Handwriting updated": "手写已更新",
   "Handwriting added to My Solution": "手写已加入我的解答",
+  "Open tabs": "打开的标签页",
+  "At most this many tabs stay open in each editor area; opening another closes the one used least recently.": "每个编辑区最多保留这么多个标签页；再打开新的会关闭最久没用的那个。",
 };

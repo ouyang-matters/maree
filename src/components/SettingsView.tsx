@@ -91,6 +91,15 @@ export function SettingsView() {
             ))}
           </div>
         </Row>
+        <Row label={t("Open tabs")} hint={t("At most this many tabs stay open in each editor area; opening another closes the one used least recently.")}>
+          <select className="select" style={{ width: 90 }} value={settings.maxTabs} onChange={(e) => A.updateSettings({ maxTabs: Number(e.target.value) })}>
+            {[3, 4, 5, 6, 8, 10].map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </Row>
         <Row label={t("Spell checking")} hint={t("Checks prose in the editor; mathematics is ignored by most dictionaries.")}>
           <label className="checkbox">
             <input type="checkbox" checked={settings.spellcheck} onChange={(e) => A.updateSettings({ spellcheck: e.target.checked })} />

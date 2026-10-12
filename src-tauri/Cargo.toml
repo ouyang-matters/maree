@@ -1,6 +1,6 @@
 [package]
 name = "maree"
-version = "1.1.5"
+version = "1.1.6"
 description = "Marée — a local-first mathematical problem library"
 authors = ["Marée contributors"]
 edition = "2021"

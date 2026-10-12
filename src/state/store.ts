@@ -129,6 +129,8 @@ export interface Settings {
   autoUpdate: boolean;
   /** Problems gathered in "To ChatGPT", in order. */
   chatTray: string[];
+  /** Most tabs kept open per editor area; opening more closes the least recently used. */
+  maxTabs: number;
 }
 
 export interface Layout {
@@ -205,6 +207,7 @@ export const DEFAULT_SETTINGS: Settings = {
   inboxFolder: "",
   autoUpdate: true,
   chatTray: [],
+  maxTabs: 5,
 };
 
 export const DEFAULT_LAYOUT: Layout = {

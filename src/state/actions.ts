@@ -30,6 +30,7 @@ import {
   get,
   set,
   toast,
+  useStore,
   type DialogSpec,
   type EditorGroup,
   type ImportSession,
@@ -71,6 +72,10 @@ export async function boot(): Promise<void> {
     await reloadAll();
     set({ info, ready: true });
     restoreSession();
+    touchTabs();
+    useStore.subscribe((s, prev) => {
+      if (s.groups !== prev.groups || s.activeGroup !== prev.activeGroup) touchTabs();
+    });
     const s = get();
     if (!s.settings.onboardingDone && s.problems.length === 0 && s.courses.length === 0) openTab({ id: "welcome", kind: "welcome" });
     p.window.onCloseRequested(async () => {
@@ -247,6 +252,14 @@ function restoreSession(): void {
       })
       .filter((g) => g.tabs.length);
     if (!groups.length) return;
+    // A session saved before the limit existed may hold many tabs: keep the active one and its neighbours.
+    for (const g of groups) {
+      const max = Math.max(2, get().settings.maxTabs || 5);
+      if (g.tabs.length <= max) continue;
+      const at = Math.max(0, g.tabs.findIndex((t) => t.id === g.activeId));
+      const start = Math.min(Math.max(0, at - Math.floor(max / 2)), g.tabs.length - max);
+      g.tabs = g.tabs.slice(start, start + max);
+    }
     set({ groups, activeGroup: Math.min(sess.activeGroup ?? 0, groups.length - 1) });
     for (const g of groups) for (const t of g.tabs) if (t.kind === "problem") void loadProblem(t.problemId);
   });
@@ -402,6 +415,25 @@ function updateGroups(fn: (groups: EditorGroup[]) => EditorGroup[], activeGroup?
   scheduleSessionSave();
 }
 
+/** When each tab was last in front, for closing the least recently used one. */
+const tabUsed = new Map<string, number>();
+let tabClock = 0;
+function touchTabs(): void {
+  for (const g of get().groups) if (g.activeId) tabUsed.set(g.activeId, ++tabClock);
+}
+
+/** Closes the least recently used tabs beyond the limit (never `keep`, never an import in progress). */
+function trimTabs(g: EditorGroup, keep: string): void {
+  const max = Math.max(2, get().settings.maxTabs || 5);
+  while (g.tabs.length > max) {
+    const closable = g.tabs.filter((t) => t.id !== keep && t.kind !== "import");
+    if (!closable.length) break;
+    const oldest = closable.reduce((a, b) => ((tabUsed.get(a.id) ?? 0) <= (tabUsed.get(b.id) ?? 0) ? a : b));
+    g.tabs.splice(g.tabs.indexOf(oldest), 1);
+    tabUsed.delete(oldest.id);
+  }
+}
+
 export function openTab(tab: Tab, opts: { group?: number; preview?: boolean } = {}): void {
   const s = get();
   let gi = opts.group ?? s.activeGroup;
@@ -432,6 +464,8 @@ export function openTab(tab: Tab, opts: { group?: number; preview?: boolean } = 
       }
     }
     g.activeId = tab.id;
+    tabUsed.set(tab.id, ++tabClock);
+    trimTabs(g, tab.id);
     return groups;
   }, gi);
 }

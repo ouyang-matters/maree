@@ -202,7 +202,21 @@ await page.waitForTimeout(3000);
 files = clipboardFiles().map((f) => path.basename(f));
 check("13. Copy for ChatGPT includes the handwritten answer", files.length === 3 && /^1 problem\.png$/.test(files[0]) && /^2 my answer\.png$/.test(files[1]) && /^3 my answer 2\.png$/.test(files[2]), files.join(", "));
 
+// 8. Tabs are limited: opening many problems keeps at most five tabs, the newest in front.
+const extra = [];
+for (let i = 1; i <= 7; i++) extra.push(await page.evaluate((n) => window.__maree.createProblem({ title: `Tab test ${n}` }), i));
+for (const id of extra) await page.evaluate((x) => window.__maree.openProblem(x), id);
+await page.waitForTimeout(500);
+const tabs = await page.evaluate(() => window.__maree.state().groups.map((g) => g.tabs.length));
+const front = await page.evaluate(() => {
+  const s = window.__maree.state();
+  const g = s.groups[s.activeGroup];
+  return g.tabs.find((t) => t.id === g.activeId)?.problemId;
+});
+await shot(page, "8-tabs");
+check("14. At most five tabs stay open", tabs.every((n) => n <= 5) && front === extra[extra.length - 1], `tabs per area: ${tabs.join(", ")}`);
+
 await edge.close();
 proc.kill();
-console.log(`\n${13 - failed}/13 checks passed. Screenshots: ${out}`);
+console.log(`\n${14 - failed}/14 checks passed. Screenshots: ${out}`);
 process.exit(failed ? 1 : 0);
