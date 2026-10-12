@@ -138,3 +138,14 @@ describe("photo problems in the repository", () => {
     expect(p.attachments).toHaveLength(1);
   });
 });
+
+describe("ChatGPT file names", () => {
+  it("keep one problem short and number several in paste order", async () => {
+    const { chatGptFileName, fileTitle } = await import("../src/export/chatgpt");
+    expect(chatGptFileName(1, 2, null, "problem", 1, "jpg")).toBe("1 problem.jpg");
+    expect(chatGptFileName(2, 2, null, "my answer", 1, "jpg")).toBe("2 my answer.jpg");
+    expect(chatGptFileName(3, 12, { index: 2, title: "Photo Oct 11, 2026 · 2" }, "problem", 2, "png")).toBe("03 Q2 Photo Oct 11 2026 2 - problem 2.png");
+    expect(fileTitle("Limit with a 1/n bound")).toBe("Limit with a 1n bound");
+    expect(fileTitle("x".repeat(60)).length).toBe(40);
+  });
+});

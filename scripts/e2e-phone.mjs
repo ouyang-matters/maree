@@ -113,17 +113,33 @@ const target = st.problems.find((p) => p.title === "Limit with a 1/n bound");
 const p = await page.evaluate((id) => window.__maree.getProblem(id), target.id);
 check("7. Answer crop is referenced in My Solution", /^!\[My answer\]\(attachment:photo-.*-3\.jpg\)$/.test(p.solution) && p.attachments.length === 2, p.solution);
 
-// 4. Copy for ChatGPT: the problem photo and the answer photo as two files.
+// 4. Everything from the photo is gathered in "To ChatGPT"; copying it keeps each
+//    problem next to its answer.
+const tray = await page.evaluate(() => window.__maree.state().settings.chatTray.length);
+await page.getByText("To ChatGPT", { exact: true }).first().click();
+await page.waitForSelector(".tray-item");
+await page.waitForTimeout(800);
+await shot(page, "4-tray");
+await page.locator(".tray-head .btn-primary").click();
+await page.waitForTimeout(2500);
+const trayFiles = clipboardFiles().map((f) => path.basename(f));
+check(
+  "8. To ChatGPT gathers the photo's problems and copies them in order",
+  tray === 2 && trayFiles.length === 3 && /^01 Q1 Limit with a 1n bound - problem\.jpg$/.test(trayFiles[0]) && /^02 Q1 .* - my answer\.jpg$/.test(trayFiles[1]) && /^03 Q2 .* - problem\.jpg$/.test(trayFiles[2]),
+  trayFiles.join(", "),
+);
+
+// 5. Copy for ChatGPT from one problem: the problem photo and the answer photo as two files.
 await page.evaluate((id) => window.__maree.openProblem(id), target.id);
 await page.waitForSelector(".pv-statement img");
 await page.waitForTimeout(600);
-await shot(page, "4-problem");
+await shot(page, "5-problem");
 await page.keyboard.press("Control+Shift+C");
 await page.waitForTimeout(2500);
 let files = clipboardFiles();
-check("8. Copy for ChatGPT puts problem and answer photos on the clipboard", files.length === 2 && /1 problem\.jpg$/.test(files[0]) && /2 my answer\.jpg$/.test(files[1]), files.map((f) => path.basename(f)).join(", "));
+check("9. Copy for ChatGPT puts problem and answer photos on the clipboard", files.length === 2 && /1 problem\.jpg$/.test(files[0]) && /2 my answer\.jpg$/.test(files[1]), files.map((f) => path.basename(f)).join(", "));
 
-// 5. A typed problem is typeset into images.
+// 6. A typed problem is typeset into images.
 const typed = await page.evaluate(
   (input) => window.__maree.createProblem(input),
   { title: "Uniqueness of limits", statement: String.raw`Let \((a_n)\) converge to \(L\) and \(M\). Prove \(L = M\).`, solution: String.raw`Take \(\varepsilon = |L-M|/2\).` },
@@ -135,9 +151,9 @@ await page.waitForTimeout(3000);
 files = clipboardFiles();
 const sizes = files.map((f) => fs.statSync(f).size);
 for (const f of files) fs.copyFileSync(f, path.join(out, `clip-${path.basename(f)}`));
-check("9. Typed text is rendered to images", files.length === 2 && files.every((f) => f.endsWith(".png")) && sizes.every((s) => s > 5000), sizes.join(" B, ") + " B");
+check("10. Typed text is rendered to images", files.length === 2 && files.every((f) => f.endsWith(".png")) && sizes.every((s) => s > 5000), sizes.join(" B, ") + " B");
 
 await edge.close();
 proc.kill();
-console.log(`\n${9 - failed}/9 checks passed. Screenshots: ${out}`);
+console.log(`\n${10 - failed}/10 checks passed. Screenshots: ${out}`);
 process.exit(failed ? 1 : 0);

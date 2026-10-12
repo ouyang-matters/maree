@@ -17,8 +17,10 @@ import {
   Plus,
   Trash2,
   Images,
+  MessageSquareShare,
 } from "lucide-react";
 import { openInbox } from "../state/inbox";
+import { openTray } from "../state/tray";
 import { useStore, get } from "../state/store";
 import * as A from "../state/actions";
 import { openContextMenu, type MenuItem } from "../ui/Menu";
@@ -177,6 +179,15 @@ export function Sidebar() {
     const g = s.groups[s.activeGroup];
     return g?.tabs.find((x) => x.id === g.activeId)?.kind === "inbox";
   });
+  const trayInFront = useStore((s) => {
+    const g = s.groups[s.activeGroup];
+    return g?.tabs.find((x) => x.id === g.activeId)?.kind === "tray";
+  });
+  const tray = useStore((s) => s.settings.chatTray);
+  const trayCount = useMemo(() => {
+    const live = new Set(problems.filter((p) => !p.deletedAt).map((p) => p.id));
+    return tray.filter((id) => live.has(id)).length;
+  }, [tray, problems]);
   const [openTopics, setOpenTopics] = useState<Record<string, boolean>>({});
   const [showArchived, setShowArchived] = useState(false);
 
@@ -458,6 +469,9 @@ export function Sidebar() {
         <Item icon={<Clock3 size={15} />} label={t("Recently Edited")} active={listMode === "recent"} onClick={A.showRecent} />
         {(inboxCount > 0 || phoneOn) && (
           <Item icon={<Images size={15} />} label={t("Photo Inbox")} count={inboxCount || undefined} active={inboxInFront} onClick={openInbox} />
+        )}
+        {trayCount > 0 && (
+          <Item icon={<MessageSquareShare size={15} />} label={t("To ChatGPT")} count={trayCount} active={trayInFront} onClick={openTray} />
         )}
         {counts.importReview > 0 && (
           <Item icon={<AlertTriangle size={14} />} label={t("Needs Import Review")} count={counts.importReview} active={isActive("import-review")} onClick={A.showImportReview} />

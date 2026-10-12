@@ -1734,3 +1734,102 @@
   color: var(--text);
   --prose-size: 17px;
 }
+
+/* ------------------------------------------------------------ to ChatGPT */
+.tray {
+  height: 100%;
+  overflow-y: auto;
+  padding: 18px 28px 40px;
+}
+.tray-head {
+  position: sticky;
+  top: -18px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -18px -28px 0;
+  padding: 14px 28px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.tray-warn {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--st-needs_review);
+}
+.tray-list {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 1100px;
+}
+.tray-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elev);
+  padding: 10px 14px 12px;
+}
+.tray-item.off {
+  opacity: 0.5;
+}
+.tray-item-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tray-num {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  min-width: 26px;
+}
+.tray-title {
+  font-weight: 600;
+  text-align: left;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tray-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 8px;
+}
+.tray-col {
+  min-width: 0;
+  max-height: 320px;
+  overflow: auto;
+}
+.tray-col-label {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 4px;
+}
+.tray-prose {
+  font-size: 14px;
+}
+.tray-prose img {
+  max-width: 100%;
+  max-height: 260px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+.tray-none {
+  font-size: 13px;
+  margin: 4px 0 0;
+}
+.tray-empty {
+  height: 100%;
+  gap: 10px;
+}
+.tray input[type="checkbox"] {
+  accent-color: var(--accent);
+}

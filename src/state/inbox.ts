@@ -11,6 +11,7 @@ import { t, fmtDate } from "../i18n";
 import { appendBlock, imageMarkdown, photoFileName, readingOrder, type Region } from "../domain/photos";
 import { crop, decodeImage, rotated, toBytes, type Quarter } from "../image/photo";
 import { buildChatGptPayload } from "../export/chatgpt";
+import { addToTray, openTray } from "./tray";
 
 let started = false;
 let folderTimer: number | null = null;
@@ -244,35 +245,48 @@ export async function commitPhoto(item: InboxItem, quarter: Quarter, regions: Re
   const ids = [...created.values()];
   await A.refreshProblems([...ids, ...touched], { full: true });
   await refreshInbox();
-  const first = ids[0] ?? [...touched][0];
+  // Everything from this photo is gathered for ChatGPT, each problem with its answer.
+  await addToTray([...ids, ...[...touched].filter((id) => !ids.includes(id))], { quiet: true });
   const msg =
     ids.length && touched.size
       ? t("{q} problem(s) created, {a} answer(s) attached", { q: ids.length, a: touched.size })
       : ids.length
         ? t("{q} problem(s) created", { q: ids.length })
         : t("{a} answer(s) attached", { a: touched.size });
-  toast(msg, "success", first ? { label: t("Open"), run: () => void A.openProblem(first, { preview: false }) } : undefined);
+  toast(`${msg} · ${t("added to To ChatGPT")}`, "success", { label: t("Open To ChatGPT"), run: openTray });
   return ids;
 }
 
-/** Puts the problem and my answer on the clipboard as images for a chat with ChatGPT. */
-export async function copyForChatGpt(problemId: string): Promise<void> {
+/** ChatGPT accepts about this many files in one message. */
+export const CHATGPT_FILE_LIMIT = 10;
+
+/** Puts the problems and my answers on the clipboard as images for a chat with ChatGPT. */
+export async function copyForChatGpt(problemIds: string | string[]): Promise<void> {
+  const ids = Array.isArray(problemIds) ? problemIds : [problemIds];
+  if (!ids.length) return;
   await flushAutosave();
-  const p = await A.loadProblem(problemId, true);
-  if (!p) return;
+  const problems = [];
+  for (const id of ids) {
+    const p = await A.loadProblem(id, true);
+    if (p && !p.deletedAt) problems.push(p);
+  }
+  if (!problems.length) return;
   try {
-    const payload = await buildChatGptPayload(p, (a) => platform().readStored(a.storedPath), { problem: t("problem"), answer: t("my answer") });
+    const payload = await buildChatGptPayload(problems, (a) => platform().readStored(a.storedPath), { problem: t("problem"), answer: t("my answer") });
     if (!payload.files.length) {
       toast(t("This problem has no statement or answer to copy yet."), "info");
       return;
     }
     await platform().copyImages(payload.files, payload.combined);
-    toast(
-      payload.answerCount
-        ? t("Problem and answer copied ({n} images). Paste into ChatGPT with Ctrl+V.", { n: payload.files.length })
-        : t("Problem copied ({n} images). Paste into ChatGPT with Ctrl+V.", { n: payload.files.length }),
-      "success",
-    );
+    const n = payload.files.length;
+    let msg =
+      problems.length > 1
+        ? t("{p} problems copied ({n} images). Paste into ChatGPT with Ctrl+V.", { p: problems.length, n })
+        : payload.answerCount
+          ? t("Problem and answer copied ({n} images). Paste into ChatGPT with Ctrl+V.", { n })
+          : t("Problem copied ({n} images). Paste into ChatGPT with Ctrl+V.", { n });
+    if (n > CHATGPT_FILE_LIMIT) msg += " " + t("ChatGPT takes about {max} files per message; copy fewer problems if it refuses some.", { max: CHATGPT_FILE_LIMIT });
+    toast(msg, n > CHATGPT_FILE_LIMIT ? "info" : "success");
   } catch (e) {
     toast(e instanceof Error ? e.message : String(e), "error");
   }

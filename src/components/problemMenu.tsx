@@ -1,4 +1,6 @@
-import { CalendarClock, Copy, FileDown, FileText, PanelRight, Printer, Trash2 } from "lucide-react";
+import { CalendarClock, ClipboardCopy, Copy, FileDown, FileText, MessageSquareShare, PanelRight, Printer, Trash2 } from "lucide-react";
+import { copyForChatGpt } from "../state/inbox";
+import { addToTray } from "../state/tray";
 import type { MenuItem } from "../ui/Menu";
 import { get } from "../state/store";
 import * as A from "../state/actions";
@@ -96,6 +98,10 @@ export function problemMenuItems(ids: string[], opts: { inTrash?: boolean; inVie
     },
     { label: t("Schedule Review"), icon: <CalendarClock size={14} />, submenu: reviewDateItems(ids) },
     { separator: true },
+  );
+  items.push(
+    { label: ids.length > 1 ? t("Copy {n} for ChatGPT", { n: ids.length }) : t("Copy for ChatGPT"), icon: <ClipboardCopy size={14} />, onSelect: () => copyForChatGpt(ids) },
+    { label: t("Add to To ChatGPT"), icon: <MessageSquareShare size={14} />, onSelect: () => addToTray(ids) },
   );
   if (single) {
     items.push(

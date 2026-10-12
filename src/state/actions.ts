@@ -239,7 +239,7 @@ function restoreSession(): void {
     const valid = (t: Tab) =>
       (t.kind === "problem" && s.problems.some((p) => p.id === t.problemId && !p.deletedAt)) ||
       (t.kind === "source" && s.sources.some((x) => x.id === t.sourceId)) ||
-      ["progress", "settings", "help", "inbox"].includes(t.kind);
+      ["progress", "settings", "help", "inbox", "tray"].includes(t.kind);
     const groups: EditorGroup[] = sess.groups
       .map((g, i) => {
         const tabs = g.tabs.filter(valid);

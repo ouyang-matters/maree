@@ -37,7 +37,9 @@ import {
   Images,
   ImagePlus,
   Smartphone,
+  MessageSquareShare,
 } from "lucide-react";
+import { addToTray, openTray } from "../state/tray";
 import { addPhotos, copyForChatGpt, openInbox } from "../state/inbox";
 import { checkForUpdates } from "../state/updates";
 import { get, activeProblemId, set } from "../state/store";
@@ -140,7 +142,7 @@ export function buildCommands(): Command[] {
       category: t("Edit"),
       shortcut: "Ctrl+Shift+C",
       icon: <ClipboardCopy size={15} />,
-      run: () => targetIds()[0] && copyForChatGpt(targetIds()[0]),
+      run: () => targetIds().length && copyForChatGpt(targetIds()),
       enabled: hasTarget,
       global: true,
     },
@@ -228,6 +230,8 @@ export function buildCommands(): Command[] {
     { id: "nav.review", label: t("Review Queue"), category: t("Go"), shortcut: "Ctrl+2", icon: <Inbox size={15} />, run: A.showReview, global: true },
     { id: "nav.recent", label: t("Recently Edited"), category: t("Go"), shortcut: "Ctrl+3", icon: <History size={15} />, run: A.showRecent, global: true },
     { id: "inbox.open", label: t("Photo Inbox"), category: t("Go"), shortcut: "Ctrl+4", icon: <Images size={15} />, run: openInbox, global: true },
+    { id: "tray.open", label: t("To ChatGPT"), category: t("Go"), shortcut: "Ctrl+5", icon: <MessageSquareShare size={15} />, run: openTray, global: true },
+    { id: "tray.add", label: t("Add to To ChatGPT"), category: t("Edit"), icon: <MessageSquareShare size={15} />, run: () => addToTray(targetIds()), enabled: hasTarget },
     { id: "inbox.add", label: t("Add Photos to Inbox…"), category: t("File"), icon: <ImagePlus size={15} />, run: () => addPhotos() },
     { id: "phone.connect", label: t("Connect Phone…"), category: t("Tools"), icon: <Smartphone size={15} />, run: () => A.openDialog({ kind: "phone" }) },
     { id: "nav.trash", label: t("Trash"), category: t("Go"), icon: <Trash2 size={15} />, run: A.showTrash },

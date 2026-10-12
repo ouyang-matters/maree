@@ -29,7 +29,8 @@ export type Tab =
   | { id: string; kind: "settings" }
   | { id: string; kind: "welcome" }
   | { id: string; kind: "help" }
-  | { id: string; kind: "inbox" };
+  | { id: string; kind: "inbox" }
+  | { id: string; kind: "tray" };
 
 export interface EditorGroup {
   id: string;
@@ -125,6 +126,8 @@ export interface Settings {
   inboxFolder: string;
   /** Look for new versions on GitHub Releases. */
   autoUpdate: boolean;
+  /** Problems gathered in "To ChatGPT", in order. */
+  chatTray: string[];
 }
 
 export interface Layout {
@@ -200,6 +203,7 @@ export const DEFAULT_SETTINGS: Settings = {
   phonePort: 47147,
   inboxFolder: "",
   autoUpdate: true,
+  chatTray: [],
 };
 
 export const DEFAULT_LAYOUT: Layout = {

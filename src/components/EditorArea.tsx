@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BarChart3, Columns2, FileInput, FileText, HelpCircle, Images, Inbox, Rows2, Settings, Sparkles, X } from "lucide-react";
+import { BarChart3, Columns2, FileInput, FileText, HelpCircle, Images, Inbox, MessageSquareShare, Rows2, Settings, Sparkles, X } from "lucide-react";
 import { useStore, get, type Tab } from "../state/store";
 import * as A from "../state/actions";
 import { problemLabel } from "../domain/filters";
@@ -16,6 +16,7 @@ import { SettingsView } from "./SettingsView";
 import { WelcomeView } from "./WelcomeView";
 import { HelpView } from "./HelpView";
 import { InboxView } from "./InboxView";
+import { TrayView } from "./TrayView";
 import { t } from "../i18n";
 
 function TabLabel({ tab }: { tab: Tab }) {
@@ -83,6 +84,13 @@ function TabLabel({ tab }: { tab: Tab }) {
           <span className="tab-label">{t("Photo Inbox")}</span>
         </>
       );
+    case "tray":
+      return (
+        <>
+          <MessageSquareShare size={13} />
+          <span className="tab-label">{t("To ChatGPT")}</span>
+        </>
+      );
   }
 }
 
@@ -104,6 +112,8 @@ function TabBody({ tab }: { tab: Tab }) {
       return <HelpView />;
     case "inbox":
       return <InboxView />;
+    case "tray":
+      return <TrayView />;
   }
 }
 

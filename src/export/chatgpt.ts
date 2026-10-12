@@ -62,36 +62,65 @@ export interface ChatGptPayload {
   answerCount: number;
 }
 
-/** Builds the clipboard payload; `read` loads a stored attachment. */
-export async function buildChatGptPayload(p: Problem, read: (a: Attachment) => Promise<Uint8Array>, labels: { problem: string; answer: string }): Promise<ChatGptPayload> {
-  const { question, answer } = chatGptSections(p);
+/** "Limit with a 1/n bound" → "Limit with a 1n bound", short enough for a file name. */
+export function fileTitle(title: string, max = 40): string {
+  const clean = title.replace(/[\\/:*?"<>|${}^_]/g, "").replace(/[,·]/g, " ").replace(/\s+/g, " ").trim();
+  return clean.length > max ? `${clean.slice(0, max - 1).trimEnd()}…` : clean;
+}
+
+/**
+ * File names for the pictures, in paste order. One problem: "1 problem.jpg", "2 my answer.jpg".
+ * Several: "01 Q1 Uniqueness - problem.jpg", "02 Q1 Uniqueness - my answer.jpg", "03 Q2 …".
+ */
+export function chatGptFileName(seq: number, total: number, q: { index: number; title: string } | null, label: string, nth: number, ext: string): string {
+  const more = nth > 1 ? ` ${nth}` : "";
+  if (!q) return `${seq} ${label}${more}.${ext}`;
+  const width = String(total).length < 2 ? 2 : String(total).length;
+  const title = fileTitle(q.title);
+  return `${String(seq).padStart(width, "0")} Q${q.index}${title ? ` ${title}` : ""} - ${label}${more}.${ext}`;
+}
+
+/** Builds the clipboard payload for one or more problems; `read` loads a stored attachment. */
+export async function buildChatGptPayload(
+  problems: Problem | Problem[],
+  read: (a: Attachment) => Promise<Uint8Array>,
+  labels: { problem: string; answer: string },
+): Promise<ChatGptPayload> {
+  const list = Array.isArray(problems) ? problems : [problems];
+  const plan: { q: { index: number; title: string } | null; label: string; nth: number; text?: string; image?: Attachment }[] = [];
+  let questionCount = 0;
+  let answerCount = 0;
+  list.forEach((p, i) => {
+    const { question, answer } = chatGptSections(p);
+    const q = list.length > 1 ? { index: i + 1, title: p.title } : null;
+    for (const [sec, label, isAnswer] of [[question, labels.problem, false], [answer, labels.answer, true]] as const) {
+      let nth = 0;
+      if (sec.text) plan.push({ q, label, nth: ++nth, text: sec.text });
+      for (const a of sec.images) plan.push({ q, label, nth: ++nth, image: a });
+      if (isAnswer) answerCount += nth;
+      else questionCount += nth;
+    }
+  });
   const files: ClipboardImage[] = [];
   const pictures: (HTMLCanvasElement | ImageBitmap)[] = [];
-  let n = 0;
-  const add = async (sec: ChatGptSection, label: string): Promise<number> => {
-    let count = 0;
-    const name = (ext: string) => `${++n} ${label}${count ? ` ${count + 1}` : ""}.${ext}`;
-    if (sec.text) {
-      const c = await renderTextImage(sec.text);
-      files.push({ name: name("png"), bytes: await toBytes(c, "image/png") });
+  let seq = 0;
+  for (const item of plan) {
+    seq++;
+    if (item.text) {
+      const c = await renderTextImage(item.text);
+      files.push({ name: chatGptFileName(seq, plan.length, item.q, item.label, item.nth, "png"), bytes: await toBytes(c, "image/png") });
       pictures.push(c);
-      count++;
-    }
-    for (const a of sec.images) {
-      const bytes = await read(a);
-      const ext = a.fileName.split(".").pop()?.toLowerCase() || "png";
-      files.push({ name: name(ext), bytes });
+    } else if (item.image) {
+      const bytes = await read(item.image);
+      const ext = item.image.fileName.split(".").pop()?.toLowerCase() || "png";
+      files.push({ name: chatGptFileName(seq, plan.length, item.q, item.label, item.nth, ext), bytes });
       try {
-        pictures.push(await decodeImage(bytes, a.mime));
+        pictures.push(await decodeImage(bytes, item.image.mime));
       } catch {
         /* still sent as a file */
       }
-      count++;
     }
-    return count;
-  };
-  const questionCount = await add(question, labels.problem);
-  const answerCount = await add(answer, labels.answer);
+  }
   let combined: ChatGptPayload["combined"] = null;
   if (pictures.length) {
     const sheet = fit(stack(pictures, 1400), 4000);
