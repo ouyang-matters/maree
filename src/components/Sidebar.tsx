@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   Archive,
@@ -19,6 +19,7 @@ import {
   Images,
   MessageSquareShare,
 } from "lucide-react";
+import { BUCKETS, BUCKET_DEFAULT, BUCKET_LABEL, bucketOf } from "../domain/status";
 import { openInbox } from "../state/inbox";
 import { openTray } from "../state/tray";
 import { useStore, get } from "../state/store";
@@ -394,22 +395,61 @@ export function Sidebar() {
         />
         {open && (
           <div className="sb-course-body">
-            {lecs.map((l) => (
-              <Item
-                key={l.id}
-                depth={1}
-                icon={<span className="lec-num">{l.number || "·"}</span>}
-                label={l.title || (l.number ? `${t("Lecture")} ${l.number}` : t("Untitled lecture"))}
-                title={lectureLabel(l) + (l.description ? ` · ${l.description}` : "") + (l.date ? ` · ${A.formatDate(l.date)}` : "")}
-                count={counts.lecture.get(l.id)}
-                active={isActive("lecture", l.id)}
-                onClick={() => A.showLecture(l.id)}
-                onContext={(e) => lectureMenu(e, l.id)}
-                onDropIds={(ids) =>
-                  A.bulkUpdate(ids, { addLectureIds: [l.id], courseId: l.courseId }, t("Added {n} problem(s) to {name}", { n: ids.length, name: lectureLabel(l) }))
-                }
-              />
-            ))}
+            {lecs.map((l) => {
+              // Theory / application within the lecture, shown when the lecture is expanded.
+              const kinds = BUCKETS.map((b) => ({ b, n: live.filter((p) => p.lectureIds.includes(l.id) && bucketOf(p.category) === b).length })).filter((x) => x.n > 0);
+              const lkey = `lecture:${l.id}`;
+              const lopen = kinds.length > 0 && !collapsed(lkey, true);
+              return (
+                <Fragment key={l.id}>
+                  <Item
+                    depth={1}
+                    icon={<span className="lec-num">{l.number || "·"}</span>}
+                    label={l.title || (l.number ? `${t("Lecture")} ${l.number}` : t("Untitled lecture"))}
+                    title={lectureLabel(l) + (l.description ? ` · ${l.description}` : "") + (l.date ? ` · ${A.formatDate(l.date)}` : "")}
+                    count={counts.lecture.get(l.id)}
+                    active={isActive("lecture", l.id) && !origin.bucket}
+                    onClick={() => {
+                      A.showLecture(l.id);
+                      if (kinds.length && !lopen) toggle(lkey, true);
+                    }}
+                    onContext={(e) => lectureMenu(e, l.id)}
+                    onDropIds={(ids) =>
+                      A.bulkUpdate(ids, { addLectureIds: [l.id], courseId: l.courseId }, t("Added {n} problem(s) to {name}", { n: ids.length, name: lectureLabel(l) }))
+                    }
+                    chevron={
+                      kinds.length ? (
+                        <span
+                          className="chev"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggle(lkey, true);
+                          }}
+                        >
+                          {lopen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                        </span>
+                      ) : (
+                        <span className="chev" />
+                      )
+                    }
+                  />
+                  {lopen &&
+                    kinds.map(({ b, n }) => (
+                      <Item
+                        key={b}
+                        depth={2}
+                        className="sb-bucket"
+                        icon={<span className={`sb-bucket-dot ${b}`} />}
+                        label={t(BUCKET_LABEL[b])}
+                        count={n}
+                        active={listMode === "filter" && origin.kind === "lecture" && origin.id === l.id && origin.bucket === b}
+                        onClick={() => A.showLectureBucket(l.id, b)}
+                        onDropIds={(ids) => A.bulkUpdate(ids, { addLectureIds: [l.id], courseId: l.courseId, category: BUCKET_DEFAULT[b] }, t("Moved {n} problem(s) to {name}", { n: ids.length, name: `${lectureLabel(l)} · ${t(BUCKET_LABEL[b])}` }))}
+                      />
+                    ))}
+                </Fragment>
+              );
+            })}
             {lecs.length === 0 && (
               <div className="sb-empty indent">
                 <button onClick={() => A.openDialog({ kind: "lectures-bulk", courseId: c.id })}>{t("Add lectures")}</button>

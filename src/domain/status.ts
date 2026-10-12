@@ -69,3 +69,16 @@ export function aggregateStatus(parts: Status[]): Status | null {
   if (parts.some((s) => s !== "not_started")) return "in_progress";
   return "not_started";
 }
+
+/** The two kinds of problems a lecture is split into in the sidebar. */
+export type Bucket = "theory" | "application";
+export const BUCKETS: Bucket[] = ["theory", "application"];
+export const BUCKET_LABEL: Record<Bucket, string> = { theory: "Theory", application: "Application" };
+export const BUCKET_CATEGORIES: Record<Bucket, Category[]> = { theory: ["proof", "conceptual"], application: ["application", "calculation"] };
+/** The type a new problem gets when created inside a bucket. */
+export const BUCKET_DEFAULT: Record<Bucket, Category> = { theory: "proof", application: "application" };
+
+export function bucketOf(category: Category | null): Bucket | null {
+  if (!category) return null;
+  return BUCKET_CATEGORIES.theory.includes(category) ? "theory" : "application";
+}

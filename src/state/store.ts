@@ -12,6 +12,7 @@ import type {
   Source,
   Topic,
 } from "../data/types";
+import type { Bucket } from "../domain/status";
 import type { LibraryIndex } from "../domain/filters";
 import { buildIndex } from "../domain/filters";
 import type { AppInfo, InboxItem, PhoneLinkStatus } from "../platform/types";
@@ -45,6 +46,8 @@ export interface ListOrigin {
   id?: string;
   /** Set when the scope is a topic (or source) inside one course. */
   courseId?: string;
+  /** Set when the scope is one kind of problem (theory / application) within a lecture. */
+  bucket?: Bucket;
   label: string;
 }
 

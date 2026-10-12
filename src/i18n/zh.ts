@@ -176,4 +176,6 @@ export const zh: Record<string, string> = {
   "Handwriting added to My Solution": "手写已加入我的解答",
   "Open tabs": "打开的标签页",
   "At most this many tabs stay open in each editor area; opening another closes the one used least recently.": "每个编辑区最多保留这么多个标签页；再打开新的会关闭最久没用的那个。",
+  "Theory": "理论",
+  "Application": "应用",
 };

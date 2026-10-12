@@ -1792,3 +1792,21 @@ button.diff:hover {
 .statusbar .sb-update {
   color: var(--accent);
 }
+
+.sb-bucket-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin: 0 4px;
+  background: var(--text-3);
+}
+.sb-bucket-dot.theory {
+  background: var(--accent);
+}
+.sb-bucket-dot.application {
+  background: var(--st-in_progress);
+}
+.sb-item.sb-bucket .label {
+  color: var(--text-2);
+}

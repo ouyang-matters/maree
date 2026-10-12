@@ -40,6 +40,7 @@ import {
   type Tab,
   type ThemeId,
 } from "./store";
+import { BUCKET_CATEGORIES, BUCKET_DEFAULT, BUCKET_LABEL, type Bucket } from "../domain/status";
 import { configureAutosave, flushAutosave, queuePartPatch, queueProblemPatch } from "./autosave";
 import {
   commitPlans,
@@ -291,6 +292,19 @@ export function showLecture(id: string): void {
     listMode: "filter",
     filter: { lectureIds: [id] },
     origin: { kind: "lecture", id, label: `${c ? `${c.code || c.title} · ` : ""}${lectureLabel(l)}` },
+    activeCourseId: l.courseId,
+  });
+}
+
+/** One kind of problem within a lecture: "MATH 147 · Lecture 8 · Application". */
+export function showLectureBucket(id: string, bucket: Bucket): void {
+  const l = get().index.lectures.get(id);
+  if (!l) return;
+  const c = get().index.courses.get(l.courseId);
+  resetList({
+    listMode: "filter",
+    filter: { lectureIds: [id], categories: [...BUCKET_CATEGORIES[bucket]] },
+    origin: { kind: "lecture", id, bucket, label: `${c ? `${c.code || c.title} · ` : ""}${lectureLabel(l)} · ${t(BUCKET_LABEL[bucket])}` },
     activeCourseId: l.courseId,
   });
 }
@@ -712,6 +726,7 @@ export async function createProblem(init: Partial<NewProblem> = {}): Promise<str
   }
   if (o.kind === "topic" && o.id) ctx.topicIds = [o.id];
   if (o.courseId) ctx.courseId = o.courseId;
+  if (o.bucket) ctx.category = BUCKET_DEFAULT[o.bucket];
   if (o.kind === "source" && o.id) ctx.sourceId = o.id;
   const id = await repo.createProblem({ ...ctx, ...init });
   await refreshProblems([id]);
