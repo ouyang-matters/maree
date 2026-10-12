@@ -1201,6 +1201,28 @@ export class Repo {
     return id;
   }
 
+  /**
+   * Saves a handwritten answer in one transaction: the new image, the solution text that
+   * references it (of the problem or of one part) and, when it replaces an earlier version
+   * of the drawing, removal of the old image's record.
+   */
+  async saveInk(o: { att: Omit<Attachment, "id" | "createdAt">; partId: string | null; solution: string; replaces?: string | null }): Promise<string> {
+    const now = nowIso();
+    const { id, statement } = this.attachmentInsert(o.att, now);
+    const stmts: Statement[] = [statement];
+    if (o.partId) {
+      stmts.push(
+        { sql: "UPDATE problem_parts SET solution = ?, updated_at = ? WHERE id = ? AND problem_id = ?", params: [o.solution, now, o.partId, o.att.problemId] },
+        { sql: "UPDATE problems SET updated_at = ? WHERE id = ?", params: [now, o.att.problemId] },
+      );
+    } else {
+      stmts.push(...(await this.problemUpdateStatements(o.att.problemId, { solution: o.solution }, true)));
+    }
+    if (o.replaces) stmts.push({ sql: "DELETE FROM attachments WHERE id = ? AND problem_id = ?", params: [o.replaces, o.att.problemId] });
+    await this.tx(stmts);
+    return id;
+  }
+
   async addAttachment(a: Omit<Attachment, "id" | "createdAt">): Promise<string> {
     const id = newId("att");
     const now = nowIso();

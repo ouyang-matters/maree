@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { PhoneDialog } from "./PhoneDialog";
+import { HandwritingPad } from "./HandwritingPad";
 import { useStore, get } from "../state/store";
 import * as A from "../state/actions";
 import { Dialog } from "../ui/Dialog";
@@ -811,6 +812,8 @@ export function Dialogs() {
       return <AboutDialog />;
     case "phone":
       return <PhoneDialog />;
+    case "ink":
+      return <HandwritingPad problemId={d.problemId} partId={d.partId} edit={d.edit} />;
     case "prompt":
       return <PromptDialog {...d} />;
   }

@@ -1833,3 +1833,122 @@
 .tray input[type="checkbox"] {
   accent-color: var(--accent);
 }
+
+/* ------------------------------------------------------------ handwriting pad */
+.ink-overlay {
+  place-items: center;
+  padding: 0;
+}
+.ink-dialog {
+  width: min(1180px, calc(100vw - 48px));
+  height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  box-shadow: var(--shadow-2);
+  overflow: hidden;
+  outline: none;
+}
+.ink-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.ink-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-right: 6px;
+}
+.ink-swatches,
+.ink-sizes {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ink-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-elev);
+  box-shadow: 0 0 0 1px var(--border-strong);
+  padding: 0;
+}
+.ink-swatch.on {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.ink-size {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  padding: 0;
+}
+.ink-size span {
+  display: block;
+  border-radius: 50%;
+  background: var(--text);
+}
+.ink-size:hover {
+  background: var(--bg-hover);
+}
+.ink-size.on {
+  border-color: var(--border-strong);
+  background: var(--bg-active);
+}
+.ink-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 2px;
+}
+.icon-btn.on {
+  color: var(--accent);
+  background: var(--bg-active);
+}
+.ink-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  background: var(--bg-active);
+  border-bottom: 1px solid var(--border);
+}
+.ink-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #ffffff;
+}
+.ink-canvas {
+  display: block;
+  touch-action: none;
+  cursor: crosshair;
+}
+.ink-canvas.erasing {
+  cursor: cell;
+}
+.ink-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+.ink-hint {
+  padding: 7px 14px;
+  font-size: 12px;
+  border-top: 1px solid var(--border);
+}
+.solution-editor {
+  display: contents;
+}

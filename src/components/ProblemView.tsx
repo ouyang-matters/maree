@@ -23,7 +23,10 @@ import {
   Trash2,
   X,
   ClipboardCopy,
+  PenLine,
 } from "lucide-react";
+import { editHandwriting, openHandwriting } from "../state/handwriting";
+import { isInkFile } from "../domain/ink";
 import { copyForChatGpt } from "../state/inbox";
 import { attachmentImages } from "../domain/photos";
 import { useStore, get } from "../state/store";
@@ -423,6 +426,18 @@ function WorkArea({
         ))}
       </div>
       {state.work === "solution" && (
+        <div
+          className="solution-editor"
+          onDoubleClick={(e) => {
+            // Double-clicking a handwritten answer reopens it on the pad.
+            const img = (e.target as HTMLElement).closest<HTMLElement>("img.mx-attachment[data-attachment]");
+            const name = img ? decodeURIComponent(img.dataset.attachment ?? "") : "";
+            if (isInkFile(name)) {
+              e.preventDefault();
+              editHandwriting(p.id, partId, name);
+            }
+          }}
+        >
         <MathEditor
           key={`sol-${partId ?? p.id}`}
           value={solution}
@@ -447,12 +462,16 @@ function WorkArea({
               >
                 <Copy size={13} /> {t("Copy")}
               </button>
+              <button className="btn btn-ghost btn-sm" title={t("Write your answer by hand (Ctrl+Shift+H)")} onClick={() => openHandwriting(p.id, partId)}>
+                <PenLine size={13} /> {t("Handwrite")}
+              </button>
               <button className="btn btn-sm" onClick={(e) => setAttemptAnchor(e.currentTarget)}>
                 <HistoryIcon size={13} /> {t("Record attempt")}
               </button>
             </>
           }
         />
+        </div>
       )}
       {state.work === "reference" &&
         (reference && !state.revealed ? (

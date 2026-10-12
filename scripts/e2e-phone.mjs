@@ -153,7 +153,56 @@ const sizes = files.map((f) => fs.statSync(f).size);
 for (const f of files) fs.copyFileSync(f, path.join(out, `clip-${path.basename(f)}`));
 check("10. Typed text is rendered to images", files.length === 2 && files.every((f) => f.endsWith(".png")) && sizes.every((s) => s > 5000), sizes.join(" B, ") + " B");
 
+// 7. Handwriting: write an answer with the mouse, reopen it, erase a stroke, save again.
+await page.keyboard.press("Control+Shift+H");
+await page.waitForSelector(".ink-canvas");
+await page.waitForTimeout(400);
+const scribble = async (points) => {
+  const b = await (await page.$(".ink-canvas")).boundingBox();
+  const at = ([x, y]) => [b.x + (b.width * x) / 1000, b.y + (b.width * y) / 1000];
+  await page.mouse.move(...at(points[0]));
+  await page.mouse.down();
+  for (const p of points.slice(1)) await page.mouse.move(...at(p), { steps: 6 });
+  await page.mouse.up();
+};
+// "ε > 0" in three strokes, roughly.
+await scribble([[120, 140], [80, 120], [70, 150], [110, 160], [70, 175], [80, 205], [125, 190]]);
+await scribble([[170, 140], [210, 165], [170, 190]]);
+await scribble([[260, 140], [240, 170], [260, 200], [285, 170], [260, 140]]);
+await shot(page, "6-handwriting");
+await page.getByRole("button", { name: "Add to My Solution" }).click();
+await page.waitForFunction((id) => window.__maree.state().problemCache[id]?.solution.includes("handwriting-"), typed, { timeout: 10000 });
+let hp = await page.evaluate((id) => window.__maree.getProblem(id), typed);
+const firstInk = hp.attachments.find((a) => a.fileName.startsWith("handwriting-"));
+check("11. Handwriting is saved into My Solution", !!firstInk && hp.solution.endsWith(`![My answer](attachment:${firstInk.fileName})`), hp.solution.split("\n").pop());
+
+await page.waitForSelector(`img.mx-attachment[data-attachment="${firstInk.fileName}"]`);
+await page.locator(`img.mx-attachment[data-attachment="${firstInk.fileName}"]`).first().dblclick();
+await page.waitForSelector(".ink-canvas");
+await page.waitForTimeout(800);
+const reopened = await page.locator(".ink-dialog .btn-primary").isEnabled();
+await page.getByTitle("Eraser (E)").click();
+await scribble([[255, 168], [262, 172]]);
+await shot(page, "7-handwriting-edit");
+await page.getByRole("button", { name: "Save Changes" }).click();
+await page.waitForFunction(
+  ([id, old]) => {
+    const p = window.__maree.state().problemCache[id];
+    return p && !p.solution.includes(old) && p.solution.includes("handwriting-");
+  },
+  [typed, firstInk.fileName],
+  { timeout: 10000 },
+);
+hp = await page.evaluate((id) => window.__maree.getProblem(id), typed);
+const inks = hp.attachments.filter((a) => a.fileName.startsWith("handwriting-"));
+check("12. Double-click reopens the strokes; the edit replaces the old image", reopened && inks.length === 1 && inks[0].fileName !== firstInk.fileName, inks.map((a) => a.fileName).join(", "));
+
+await page.keyboard.press("Control+Shift+C");
+await page.waitForTimeout(3000);
+files = clipboardFiles().map((f) => path.basename(f));
+check("13. Copy for ChatGPT includes the handwritten answer", files.length === 3 && /^1 problem\.png$/.test(files[0]) && /^2 my answer\.png$/.test(files[1]) && /^3 my answer 2\.png$/.test(files[2]), files.join(", "));
+
 await edge.close();
 proc.kill();
-console.log(`\n${10 - failed}/10 checks passed. Screenshots: ${out}`);
+console.log(`\n${13 - failed}/13 checks passed. Screenshots: ${out}`);
 process.exit(failed ? 1 : 0);

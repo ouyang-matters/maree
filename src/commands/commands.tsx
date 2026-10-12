@@ -38,8 +38,10 @@ import {
   ImagePlus,
   Smartphone,
   MessageSquareShare,
+  PenLine,
 } from "lucide-react";
 import { addToTray, openTray } from "../state/tray";
+import { openHandwriting } from "../state/handwriting";
 import { addPhotos, copyForChatGpt, openInbox } from "../state/inbox";
 import { checkForUpdates } from "../state/updates";
 import { get, activeProblemId, set } from "../state/store";
@@ -144,6 +146,19 @@ export function buildCommands(): Command[] {
       icon: <ClipboardCopy size={15} />,
       run: () => targetIds().length && copyForChatGpt(targetIds()),
       enabled: hasTarget,
+      global: true,
+    },
+    {
+      id: "problem.handwrite",
+      label: t("Handwrite Answer…"),
+      category: t("Problem"),
+      shortcut: "Ctrl+Shift+H",
+      icon: <PenLine size={15} />,
+      run: () => {
+        const id = activeProblemId();
+        if (id) openHandwriting(id);
+      },
+      enabled: () => !!activeProblemId(),
       global: true,
     },
     {

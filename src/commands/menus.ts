@@ -43,6 +43,7 @@ export function menuBar(): MenuDef[] {
         "edit.selectAll",
         "-",
         "search.focus",
+        "problem.handwrite",
         "problem.copyChatGpt",
         "tray.add",
         "problem.copyMarkdown",

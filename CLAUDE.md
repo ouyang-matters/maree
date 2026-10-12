@@ -47,7 +47,9 @@ android/      Android app (plain Java, no Gradle/AndroidX): WebView on the bundl
 src/
   data/         driver.ts (SqlDriver), schema.ts (migrations), repo.ts (ALL SQL), types.ts, sample.ts
   domain/       pure logic: filters & sorting, statuses, review queue, progress, photos (crop regions, BMP)
-  image/        photo.ts: canvas decode / rotate / crop / stack
+  image/        photo.ts: canvas decode / rotate / crop / stack; ink.ts: handwriting render + PNG export
+                (domain/ink.ts strokes on a 1000-unit page; domain/png.ts keeps them in a zTXt chunk,
+                so a handwritten answer can be reopened and edited from its image)
   math/         segments.ts (math-aware splitting), render.ts (markdown-it + KaTeX), unicode.ts
   import/       extract-{pdf,docx,latex,text,json}.ts → segment.ts → classify.ts / duplicates.ts → pipeline.ts
   export/       library-json.ts (lossless JSON + import), documents.ts (Markdown / LaTeX),

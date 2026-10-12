@@ -98,6 +98,7 @@ export type DialogSpec =
   | { kind: "delete-course"; courseId: string }
   | { kind: "about" }
   | { kind: "phone" }
+  | { kind: "ink"; problemId: string; partId: string | null; edit?: { attachmentId: string; fileName: string } }
   | { kind: "prompt"; title: string; label: string; value: string; allowEmpty?: boolean; onSubmit: (v: string) => unknown };
 
 export interface Toast {
