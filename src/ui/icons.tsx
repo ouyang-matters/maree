@@ -53,14 +53,8 @@ export function DifficultyMeter({ value }: { value: number | null }) {
 export function BrandGlyph({ size = 18 }: { size?: number }) {
   return (
     <svg className="brand-glyph" width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
-      <rect x="1" y="1" width="30" height="30" rx="7.5" fill="#241f28" />
-      <circle cx="19.2" cy="10.6" r="4" fill="#f5d5e2" />
-      <circle cx="21" cy="9.2" r="3.4" fill="#241f28" />
-      <g fill="none" stroke="#e0679a" strokeWidth="1.9" strokeLinecap="round">
-        <path d="M6 18.6c1.7-1.5 3.3-1.5 5 0s3.3 1.5 5 0 3.3-1.5 5 0 3.3 1.5 5 0" />
-        <path d="M6 22.2c1.7-1.5 3.3-1.5 5 0s3.3 1.5 5 0 3.3-1.5 5 0 3.3 1.5 5 0" opacity=".6" />
-        <path d="M6 25.8c1.7-1.5 3.3-1.5 5 0s3.3 1.5 5 0 3.3-1.5 5 0 3.3 1.5 5 0" opacity=".3" />
-      </g>
+      <rect x="1.5" y="1.5" width="29" height="29" rx="7" fill="#b03a6c" />
+      <path d="M6.2 16c2.2-1.94 4.4-1.94 6.56 0s4.38 1.94 6.56 0 4.38-1.94 6.56 0" fill="none" stroke="#fff" strokeWidth="2.9" strokeLinecap="round" />
     </svg>
   );
 }
