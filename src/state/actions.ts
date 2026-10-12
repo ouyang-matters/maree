@@ -27,6 +27,7 @@ import { fmtDate, setLocale, t } from "../i18n";
 import {
   DEFAULT_LAYOUT,
   DEFAULT_SETTINGS,
+  activeProblemId,
   get,
   set,
   toast,
@@ -41,6 +42,7 @@ import {
   type ThemeId,
 } from "./store";
 import { BUCKET_CATEGORIES, BUCKET_DEFAULT, BUCKET_LABEL, type Bucket } from "../domain/status";
+import { visibleProblems } from "./visible";
 import { configureAutosave, flushAutosave, queuePartPatch, queueProblemPatch } from "./autosave";
 import {
   commitPlans,
@@ -142,6 +144,14 @@ export async function updateSettings(patch: Partial<Settings>): Promise<void> {
   const settings = { ...get().settings, ...patch };
   set({ settings });
   applySettings(settings);
+  if (patch.documentMode === "single") {
+    // Keep what is in front in each editor area; the rest is reachable through Back.
+    for (const g of get().groups) {
+      const others = g.tabs.filter((t) => t.id !== g.activeId).map((t) => ({ ...t, preview: false }) as Tab);
+      if (others.length) set((s) => ({ backStack: { ...s.backStack, [g.id]: [...(s.backStack[g.id] ?? []), ...others].slice(-BACK_LIMIT) } }));
+    }
+    updateGroups((groups) => groups.map((g) => ({ ...g, tabs: g.tabs.filter((t) => t.id === g.activeId) })));
+  }
   for (const [k, v] of Object.entries(patch)) await repo.setSetting(k, v);
 }
 
@@ -255,6 +265,12 @@ function restoreSession(): void {
     if (!groups.length) return;
     // A session saved before the limit existed may hold many tabs: keep the active one and its neighbours.
     for (const g of groups) {
+      if (get().settings.documentMode !== "tabs") {
+        const keep = g.tabs.find((t) => t.id === g.activeId) ?? g.tabs[g.tabs.length - 1];
+        g.tabs = keep ? [keep] : [];
+        g.activeId = keep?.id ?? null;
+        continue;
+      }
       const max = Math.max(2, get().settings.maxTabs || 5);
       if (g.tabs.length <= max) continue;
       const at = Math.max(0, g.tabs.findIndex((t) => t.id === g.activeId));
@@ -448,6 +464,71 @@ function trimTabs(g: EditorGroup, keep: string): void {
   }
 }
 
+const BACK_LIMIT = 40;
+const singleMode = () => get().settings.documentMode !== "tabs";
+
+/** One-document mode: shows `tab` in the group, remembering what it replaces for Back. */
+function showInGroup(gi: number, tab: Tab, remember: boolean): void {
+  let back: { id: string; prev: Tab } | null = null;
+  updateGroups((groups) => {
+    while (groups.length <= gi) groups.push({ id: `g${groups.length + 1}`, tabs: [], activeId: null });
+    const g = groups[gi];
+    const cur = g.tabs.find((t) => t.id === g.activeId);
+    if (remember && cur && cur.id !== tab.id) back = { id: g.id, prev: { ...cur, preview: false } as Tab };
+    // An import in progress stays reachable from Back; everything else is simply replaced.
+    g.tabs = [{ ...tab, preview: false } as Tab];
+    g.activeId = tab.id;
+    return groups;
+  }, gi);
+  const b = back as { id: string; prev: Tab } | null;
+  if (b) {
+    set((s) => {
+      const stack = (s.backStack[b.id] ?? []).filter((t) => t.id !== b.prev.id);
+      return { backStack: { ...s.backStack, [b.id]: [...stack, b.prev].slice(-BACK_LIMIT) } };
+    });
+  }
+}
+
+export function canGoBack(groupIndex: number): boolean {
+  const g = get().groups[groupIndex];
+  return !!g && (get().backStack[g.id]?.length ?? 0) > 0;
+}
+
+/** One-document mode: returns to what the editor area showed before. */
+export function goBack(groupIndex = get().activeGroup): void {
+  const g = get().groups[groupIndex];
+  if (!g) return;
+  const stack = [...(get().backStack[g.id] ?? [])];
+  let prev = stack.pop();
+  // Skip entries that no longer exist (deleted problems, finished imports).
+  const exists = (t: Tab) =>
+    (t.kind !== "problem" || get().problems.some((p) => p.id === t.problemId && !p.deletedAt)) && (t.kind !== "import" || !!get().imports[t.importId]);
+  while (prev && !exists(prev)) prev = stack.pop();
+  set((s) => ({ backStack: { ...s.backStack, [g.id]: stack } }));
+  if (!prev) {
+    updateGroups((groups) => {
+      groups[groupIndex].tabs = [];
+      groups[groupIndex].activeId = null;
+      return groups;
+    }, groupIndex);
+    return;
+  }
+  showInGroup(groupIndex, prev, false);
+  if (prev.kind === "problem") set({ focusedId: prev.problemId, selection: [prev.problemId] });
+}
+
+/** The problem shown in the active editor area, moved one step through the current list. */
+export function stepProblem(delta: 1 | -1): void {
+  const list = visibleProblems(get());
+  if (!list.length) return;
+  const current = activeProblemId();
+  const i = current ? list.findIndex((p) => p.id === current) : -1;
+  const next = i < 0 ? list[delta > 0 ? 0 : list.length - 1] : list[i + delta];
+  if (!next) return;
+  set({ selection: [next.id], anchorId: next.id });
+  void openProblem(next.id, { preview: false });
+}
+
 export function openTab(tab: Tab, opts: { group?: number; preview?: boolean } = {}): void {
   const s = get();
   let gi = opts.group ?? s.activeGroup;
@@ -461,6 +542,10 @@ export function openTab(tab: Tab, opts: { group?: number; preview?: boolean } = 
       g.activeId = tab.id;
       return groups;
     }, where);
+    return;
+  }
+  if (singleMode()) {
+    showInGroup(opts.group ?? gi, tab, true);
     return;
   }
   updateGroups((groups) => {
@@ -500,7 +585,10 @@ export function pinTab(tabId: string): void {
 
 export async function closeTab(groupIndex: number, tabId: string): Promise<void> {
   await flushAutosave();
-  updateGroups((groups) => {
+  if (singleMode() && get().groups[groupIndex]?.activeId === tabId) {
+    // One-document mode: closing what is shown goes back to what was shown before.
+    goBack(groupIndex);
+  } else updateGroups((groups) => {
     const g = groups[groupIndex];
     if (!g) return groups;
     const idx = g.tabs.findIndex((t) => t.id === tabId);
@@ -1399,6 +1487,7 @@ function exposeTestHooks(): void {
     flush: flushAutosave,
     getProblem: (id: string) => repo.getProblem(id),
     openProblem: (id: string) => openProblem(id, { preview: false }),
+    setSetting: (key: keyof Settings, value: unknown) => updateSettings({ [key]: value } as Partial<Settings>),
     async createProblem(input: NewProblem) {
       const id = await repo.createProblem(input);
       await refreshProblems([id]);

@@ -91,6 +91,16 @@ export function SettingsView() {
             ))}
           </div>
         </Row>
+        <Row label={t("Documents")} hint={t("One at a time: opening a problem replaces the one shown; Back returns to it, and ‹ › step through the list. Tabs: each problem opens in its own tab.")}>
+          <div className="seg seg-sm" role="radiogroup">
+            {(["single", "tabs"] as const).map((m) => (
+              <button key={m} role="radio" aria-checked={settings.documentMode === m} className={settings.documentMode === m ? "on" : ""} onClick={() => A.updateSettings({ documentMode: m })}>
+                {m === "single" ? t("One at a time") : t("Tabs")}
+              </button>
+            ))}
+          </div>
+        </Row>
+        {settings.documentMode === "tabs" && (
         <Row label={t("Open tabs")} hint={t("At most this many tabs stay open in each editor area; opening another closes the one used least recently.")}>
           <select className="select" style={{ width: 90 }} value={settings.maxTabs} onChange={(e) => A.updateSettings({ maxTabs: Number(e.target.value) })}>
             {[3, 4, 5, 6, 8, 10].map((n) => (
@@ -100,6 +110,7 @@ export function SettingsView() {
             ))}
           </select>
         </Row>
+        )}
         <Row label={t("Spell checking")} hint={t("Checks prose in the editor; mathematics is ignored by most dictionaries.")}>
           <label className="checkbox">
             <input type="checkbox" checked={settings.spellcheck} onChange={(e) => A.updateSettings({ spellcheck: e.target.checked })} />

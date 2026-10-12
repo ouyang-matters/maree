@@ -39,6 +39,9 @@ import {
   Smartphone,
   MessageSquareShare,
   PenLine,
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { addToTray, openTray } from "../state/tray";
 import { openHandwriting } from "../state/handwriting";
@@ -218,6 +221,9 @@ export function buildCommands(): Command[] {
     { id: "view.splitRight", label: t("Split Editor Right"), category: t("View"), shortcut: "Ctrl+\\", icon: <Columns2 size={15} />, run: () => A.splitEditor("row"), global: true },
     { id: "view.splitDown", label: t("Split Editor Down"), category: t("View"), icon: <Rows2 size={15} />, run: () => A.splitEditor("column") },
     { id: "view.unsplit", label: t("Close Split"), category: t("View"), icon: <SquareSplitHorizontal size={15} />, run: () => A.unsplitEditor(), enabled: () => get().groups.length > 1 },
+    { id: "nav.back", label: t("Back"), category: t("Go"), shortcut: "Alt+Left", icon: <ArrowLeft size={15} />, run: () => A.goBack(), enabled: () => A.canGoBack(get().activeGroup) },
+    { id: "problem.next", label: t("Next Problem in List"), category: t("Go"), shortcut: "Ctrl+PageDown", icon: <ChevronRight size={15} />, run: () => A.stepProblem(1), global: true },
+    { id: "problem.prev", label: t("Previous Problem in List"), category: t("Go"), shortcut: "Ctrl+PageUp", icon: <ChevronLeft size={15} />, run: () => A.stepProblem(-1), global: true },
     { id: "view.nextTab", label: t("Next Tab"), category: t("View"), shortcut: "Ctrl+Tab", run: () => A.cycleTab(1), global: true, hidden: true },
     { id: "view.prevTab", label: t("Previous Tab"), category: t("View"), shortcut: "Ctrl+Shift+Tab", run: () => A.cycleTab(-1), global: true, hidden: true },
     { id: "view.zoomIn", label: t("Larger Mathematics"), category: t("View"), shortcut: "Ctrl+=", alt: ["Ctrl++"], run: () => A.updateSettings({ proseSize: Math.min(22, get().settings.proseSize + 1) }), global: true },

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { BarChart3, Columns2, FileInput, FileText, HelpCircle, Images, Inbox, MessageSquareShare, Rows2, Settings, Sparkles, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowLeft, BarChart3, ChevronLeft, ChevronRight, Columns2, FileInput, FileText, HelpCircle, Images, Inbox, MessageSquareShare, Rows2, Settings, Sparkles, X } from "lucide-react";
 import { useStore, get, type Tab } from "../state/store";
 import * as A from "../state/actions";
 import { problemLabel } from "../domain/filters";
@@ -15,6 +15,7 @@ import { ProgressView } from "./ProgressView";
 import { SettingsView } from "./SettingsView";
 import { WelcomeView } from "./WelcomeView";
 import { HelpView } from "./HelpView";
+import { visibleProblems } from "../state/visible";
 import { InboxView } from "./InboxView";
 import { TrayView } from "./TrayView";
 import { t } from "../i18n";
@@ -170,11 +171,67 @@ function Home() {
   );
 }
 
+/** One-document mode: Back, what is shown, ‹ › through the list, split controls. */
+function DocHeader({ index, active }: { index: number; active: Tab | null }) {
+  const groupsCount = useStore((s) => s.groups.length);
+  const canBack = useStore((s) => {
+    const g = s.groups[index];
+    return !!g && (s.backStack[g.id]?.length ?? 0) > 0;
+  });
+  const problems = useStore((s) => s.problems);
+  const filter = useStore((s) => s.filter);
+  const searchHits = useStore((s) => s.searchHits);
+  const sort = useStore((s) => s.sort);
+  const libIndex = useStore((s) => s.index);
+  const listMode = useStore((s) => s.listMode);
+  const list = useMemo(() => visibleProblems({ problems, filter, searchHits, sort, index: libIndex, listMode }), [problems, filter, searchHits, sort, libIndex, listMode]);
+  const pid = active?.kind === "problem" ? active.problemId : null;
+  const at = pid ? list.findIndex((p) => p.id === pid) : -1;
+  return (
+    <div className="docbar">
+      <button className="icon-btn sm" title={t("Back (Alt+Left)")} disabled={!canBack} onClick={() => A.goBack(index)}>
+        <ArrowLeft size={14} />
+      </button>
+      <div className="docbar-title">{active ? <TabLabel tab={active} /> : <span className="faint">{t("Nothing open")}</span>}</div>
+      <span className="grow" />
+      {pid && list.length > 0 && (
+        <div className="docbar-nav">
+          <button className="icon-btn sm" title={t("Previous problem in the list (Ctrl+PageUp)")} disabled={at === 0} onClick={() => A.stepProblem(-1)}>
+            <ChevronLeft size={15} />
+          </button>
+          <span className="docbar-pos">{at >= 0 ? `${at + 1} / ${list.length}` : `– / ${list.length}`}</span>
+          <button className="icon-btn sm" title={t("Next problem in the list (Ctrl+PageDown)")} disabled={at === list.length - 1} onClick={() => A.stepProblem(1)}>
+            <ChevronRight size={15} />
+          </button>
+        </div>
+      )}
+      <div className="tabs-actions">
+        {index === groupsCount - 1 && (
+          <>
+            <button className="icon-btn sm" title={t("Split Editor Right (Ctrl+\\)")} onClick={() => A.splitEditor("row")}>
+              <Columns2 size={14} />
+            </button>
+            <button className="icon-btn sm" title={t("Split Editor Down")} onClick={() => A.splitEditor("column")}>
+              <Rows2 size={14} />
+            </button>
+          </>
+        )}
+        {groupsCount > 1 && (
+          <button className="icon-btn sm" title={t("Close this group")} onClick={() => A.closeAllTabs(index)}>
+            <X size={14} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Group({ index }: { index: number }) {
   const group = useStore((s) => s.groups[index]);
   const focused = useStore((s) => s.activeGroup === index);
   const groupsCount = useStore((s) => s.groups.length);
   const [dragTab, setDragTab] = useState<string | null>(null);
+  const single = useStore((s) => s.settings.documentMode !== "tabs");
   if (!group) return null;
   const active = group.tabs.find((t) => t.id === group.activeId) ?? null;
 
@@ -187,6 +244,15 @@ function Group({ index }: { index: number }) {
       { label: groupsCount > 1 ? t("Move to Other Group") : t("Open in Split"), onSelect: () => A.moveTabToOtherGroup(index, tab.id) },
       ...(tab.kind === "problem" ? [{ label: t("Keep Open"), onSelect: () => A.pinTab(tab.id) }] : []),
     ]);
+
+  if (single) {
+    return (
+      <div className={`eg${focused ? " focused" : ""}`} onMouseDownCapture={() => A.focusGroup(index)}>
+        <DocHeader index={index} active={active} />
+        <div className="eg-body">{active ? <TabBody key={active.id} tab={active} /> : <Home />}</div>
+      </div>
+    );
+  }
 
   return (
     <div className={`eg${focused ? " focused" : ""}`} onMouseDownCapture={() => A.focusGroup(index)}>

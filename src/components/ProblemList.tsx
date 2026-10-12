@@ -25,7 +25,8 @@ import { useStore, get, type ColumnKey } from "../state/store";
 import * as A from "../state/actions";
 import type { ProblemSummary, SortKey } from "../data/types";
 import { STATUSES } from "../data/types";
-import { applyFilter, problemLabel, sortProblems, type LibraryIndex } from "../domain/filters";
+import { applyFilter, problemLabel, type LibraryIndex } from "../domain/filters";
+import { visibleProblems } from "../state/visible";
 import { reviewGroups } from "../domain/review";
 import { CATEGORY_LABEL, DIFFICULTY_LABEL, PRIORITY_LABEL, STATUS_LABEL } from "../domain/status";
 import { todayLocal } from "../data/ids";
@@ -171,23 +172,11 @@ const ALL_COLUMNS = Object.keys(COLUMNS) as ColumnKey[];
 function useVisibleProblems(): ProblemSummary[] {
   const problems = useStore((s) => s.problems);
   const filter = useStore((s) => s.filter);
-  const hits = useStore((s) => s.searchHits);
+  const searchHits = useStore((s) => s.searchHits);
   const sort = useStore((s) => s.sort);
   const index = useStore((s) => s.index);
-  const mode = useStore((s) => s.listMode);
-  return useMemo(() => {
-    const today = todayLocal();
-    if (mode === "trash") return problems.filter((p) => p.deletedAt).sort((a, b) => (b.deletedAt ?? "").localeCompare(a.deletedAt ?? ""));
-    if (mode === "recent") {
-      const live = applyFilter(problems, filter, { index, searchHits: hits, today });
-      return [...live].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 60);
-    }
-    if (mode === "review") {
-      const live = applyFilter(problems, filter, { index, searchHits: hits, today });
-      return reviewGroups(live, today).flatMap((g) => g.problems);
-    }
-    return sortProblems(applyFilter(problems, filter, { index, searchHits: hits, today }), sort, index, hits);
-  }, [problems, filter, hits, sort, index, mode]);
+  const listMode = useStore((s) => s.listMode);
+  return useMemo(() => visibleProblems({ problems, filter, searchHits, sort, index, listMode }), [problems, filter, searchHits, sort, index, listMode]);
 }
 
 /** Two-line row used when the list column is narrow (the usual three-pane layout). */

@@ -77,6 +77,10 @@ export function menuBar(): MenuDef[] {
     {
       label: t("Library"),
       items: [
+        "nav.back",
+        "problem.prev",
+        "problem.next",
+        "-",
         "nav.all",
         "nav.review",
         "nav.recent",

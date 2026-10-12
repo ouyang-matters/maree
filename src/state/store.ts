@@ -134,6 +134,8 @@ export interface Settings {
   chatTray: string[];
   /** Most tabs kept open per editor area; opening more closes the least recently used. */
   maxTabs: number;
+  /** "single": one document per editor area, replaced as you go (with Back); "tabs": browser-like tabs. */
+  documentMode: "single" | "tabs";
 }
 
 export interface Layout {
@@ -190,6 +192,8 @@ export interface State {
 
   inbox: InboxItem[];
   phone: { status: PhoneLinkStatus | null; error: string | null };
+  /** One-document mode: what each editor area showed before, for Back (keyed by group id). */
+  backStack: Record<string, Tab[]>;
   /** A newer version found by the updater. */
   update: { version: string; notes: string; installing?: boolean } | null;
 }
@@ -211,6 +215,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoUpdate: true,
   chatTray: [],
   maxTabs: 5,
+  documentMode: "single",
 };
 
 export const DEFAULT_LAYOUT: Layout = {
@@ -262,6 +267,7 @@ export const useStore = create<State>()(() => ({
   inbox: [],
   phone: { status: null, error: null },
   update: null,
+  backStack: {},
 }));
 
 export const get = () => useStore.getState();
