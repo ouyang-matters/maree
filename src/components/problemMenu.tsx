@@ -1,11 +1,11 @@
-import { CalendarClock, ClipboardCopy, Copy, FileDown, FileText, MessageSquareShare, PanelRight, Printer, Trash2 } from "lucide-react";
+import { CalendarClock, ClipboardCopy, Copy, FileDown, FileText, Flag, MessageSquareShare, PanelRight, Printer, Trash2 } from "lucide-react";
 import { copyForChatGpt } from "../state/inbox";
 import { addToTray } from "../state/tray";
 import type { MenuItem } from "../ui/Menu";
 import { get } from "../state/store";
 import * as A from "../state/actions";
 import { STATUSES } from "../data/types";
-import { DIFFICULTY_LABEL, STATUS_LABEL } from "../domain/status";
+import { DIFFICULTY_LABEL, PRIORITY_LABEL, STATUS_LABEL } from "../domain/status";
 import { StatusIcon } from "../ui/icons";
 import { lectureLabel } from "../domain/filters";
 import { todayLocal } from "../data/ids";
@@ -73,6 +73,15 @@ export function problemMenuItems(ids: string[], opts: { inTrash?: boolean; inVie
         { separator: true },
         { label: t("None"), onSelect: () => A.bulkUpdate(ids, { difficulty: null }) },
       ],
+    },
+    {
+      label: t("Priority"),
+      icon: <Flag size={14} />,
+      submenu: [3, 2, 1, 0].map((n) => ({
+        label: t(PRIORITY_LABEL[n]),
+        checked: single?.priority === n ? true : undefined,
+        onSelect: () => A.bulkUpdate(ids, { priority: n }),
+      })),
     },
     {
       label: t("Add to Lecture"),

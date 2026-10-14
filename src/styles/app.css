@@ -1854,3 +1854,13 @@ button.diff:hover {
 .docbar .tabs-actions {
   background: transparent;
 }
+
+/* Priority flag in compact list rows (Medium and High only). */
+.lp-prio {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--text-3);
+}
+.lp-prio.high {
+  color: var(--accent);
+}

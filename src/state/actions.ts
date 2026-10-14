@@ -107,6 +107,12 @@ async function loadSettings(): Promise<void> {
   }
   if (!raw.katexMacros) settings.katexMacros = { ...DEFAULT_MACROS };
   const layout: Layout = { ...DEFAULT_LAYOUT, ...((raw.layout as Partial<Layout>) ?? {}) };
+  if (((raw.layout as Partial<Layout> | undefined)?.columnsRev ?? 0) < 1) {
+    // Rev 1 added Priority to the default columns.
+    const at = layout.columns.indexOf("difficulty");
+    if (!layout.columns.includes("priority")) layout.columns = at < 0 ? [...layout.columns, "priority"] : [...layout.columns.slice(0, at), "priority", ...layout.columns.slice(at)];
+    layout.columnsRev = 1;
+  }
   set({ settings, layout });
   applySettings(settings);
   const sort = raw.sort as typeof DEFAULT_SORT | undefined;

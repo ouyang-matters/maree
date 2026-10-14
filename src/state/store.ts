@@ -66,7 +66,7 @@ export type ColumnKey =
   | "reviewDue"
   | "updated";
 
-export const DEFAULT_COLUMNS: ColumnKey[] = ["title", "lecture", "topic", "difficulty", "status", "lastAttempt"];
+export const DEFAULT_COLUMNS: ColumnKey[] = ["title", "lecture", "topic", "priority", "difficulty", "status", "lastAttempt"];
 
 export interface ImportSession {
   id: string;
@@ -147,6 +147,8 @@ export interface Layout {
   columns: ColumnKey[];
   listView: "table" | "cards";
   splitDir: "row" | "column";
+  /** Bumped when a new default column appears, so saved layouts pick it up once. */
+  columnsRev: number;
 }
 
 export interface State {
@@ -227,6 +229,7 @@ export const DEFAULT_LAYOUT: Layout = {
   columns: DEFAULT_COLUMNS,
   listView: "table",
   splitDir: "row",
+  columnsRev: 1,
 };
 
 export const useStore = create<State>()(() => ({

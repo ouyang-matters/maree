@@ -21,7 +21,7 @@ import {
   Rows3,
   Trash2,
 } from "lucide-react";
-import { useStore, get, type ColumnKey } from "../state/store";
+import { useStore, get, DEFAULT_COLUMNS, type ColumnKey } from "../state/store";
 import * as A from "../state/actions";
 import type { ProblemSummary, SortKey } from "../data/types";
 import { STATUSES } from "../data/types";
@@ -241,6 +241,11 @@ const CompactRow = memo(function CompactRow({
           {!p.reviewDue && p.lastAttemptAt && <span>{A.relativeDate(p.lastAttemptAt)}</span>}
         </div>
       </div>
+      {p.priority >= 2 && (
+        <span className={`lp-prio${p.priority >= 3 ? " high" : ""}`} title={`${t("Priority")}: ${t(PRIORITY_LABEL[p.priority])}`}>
+          <Flag size={12} />
+        </span>
+      )}
       {p.difficulty ? <DifficultyMeter value={p.difficulty} /> : null}
     </div>
   );
@@ -535,7 +540,7 @@ function columnMenu(): MenuItem[] {
       },
     })),
     { separator: true },
-    { label: t("Reset Columns"), onSelect: () => A.updateLayout({ columns: ["title", "lecture", "topic", "difficulty", "status", "lastAttempt"] }) },
+    { label: t("Reset Columns"), onSelect: () => A.updateLayout({ columns: DEFAULT_COLUMNS }) },
   ];
 }
 
